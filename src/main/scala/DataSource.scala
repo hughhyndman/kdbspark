@@ -56,7 +56,7 @@ class KdbDataSource extends DataSourceV2
 //    with ReadSupportWithSchema
     with DataSourceRegister {
   /* create a reader instance with/without a user-provided schema */
-  def createReader(schema: StructType, options: DataSourceOptions) = new KdbDataSourceReader(schema, options)  
+  override def createReader(schema: StructType, options: DataSourceOptions) = new KdbDataSourceReader(schema, options)
   def createReader(options: DataSourceOptions) = new KdbDataSourceReader(null, options)
   
   /* create a writer instance */
@@ -76,17 +76,17 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   val log = Logger.getLogger("kdbdr")
   Util.setLevel(options, log)
   
-  if (log.isDebugEnabled()) {
+  if (log.isDebugEnabled) {
     log.debug("KdbDataSourceReader()")
     for ((k,v) <- options.asMap) 
        log.debug(s"  $k: $v")
   }
     
-  val qExprProvided = options.get("q").orElse("").length > 0 
+  val qExprProvided = options.get("q").orElse("").length > 0
   
   var filters = new Array[Filter](0)   
   var kdbFilters = new Array[Object](0)  
-  var requiredSchema: StructType = null
+  var requiredSchema: StructType = _
 
   /* If no schema is provided, get it from the kdb+ function */
   if (schema == null) { 
@@ -118,7 +118,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
    * Determine which filters can be pushed down to kdb+
    */
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
-    if (log.isDebugEnabled()) {
+    if (log.isDebugEnabled) {
       log.debug("pushFilters()")
       filters.foreach(f => log.debug("  " + f.toString))
     }
@@ -152,7 +152,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   }
 
   /* Return whether the kdb+ function can support push-down filters */
-  private def canPushFilters(): Boolean = {
+  private def canPushFilters: Boolean = {
     options.getBoolean("pushFilters", true) && // if Spark caller specified option 
       !qExprProvided // and Q expression not provided
   }
@@ -166,7 +166,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
       val numparts = options.getInt("numPartitions", 1) // Number of partitions
 
       var rts = new ArrayList[InputPartition[ColumnarBatch]]      
-      for (pid <- 0 to numparts - 1) {
+      for (pid <- 0 until numparts) {
         var optionmap = options.asMap // Make copy of mutable map from options
         optionmap.put("partitionid", pid.toString)
         rts.add(new ReadTask(optionmap, kdbFilters, readSchema))       
@@ -246,7 +246,7 @@ class KdbDataSourceWriter(jobid: String, schema: StructType, mode: SaveMode, opt
   optionmap.put("jobID", jobid)
   optionmap.put("mode", mode.toString)
   
-  if (log.isDebugEnabled()) {
+  if (log.isDebugEnabled) {
     log.debug("KdbDataSourceWriter()")
     log.debug("  options:")
     for ((k,v) <- optionmap) 
