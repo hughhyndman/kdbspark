@@ -1,4 +1,4 @@
-# kdb+ Datasource (V2) for Spark 2.4.4+
+# kdb+ Data Source (V2) for Spark 2.4.4+
 
 ## Task List
 
@@ -6,7 +6,7 @@
 - [ ] Complete write support
 - [ ] Remove Kx platform support (include in comments and readme)
 - [ ] Complete README
-- [ ] Dealwith TODOs and //!
+- [ ] Deal with TODOs and //!
 
 
 ## Datatype support
