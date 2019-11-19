@@ -1,5 +1,16 @@
 # kdb+ Datasource (V2) for Spark 2.4.4+
 
+## Task List
+
+- [ ] Move examples to test area (and rename tests)
+- [ ] Complete write support
+- [ ] Remove Kx platform support (include in comments and readme)
+- [ ] Complete README
+- [ ] Dealwith TODOs and //!
+
+
+## Datatype support
+
 kdb+ | Code | Spark | Alias | Note
 -- | -- | -- | -- | --
 boolean | b | BooleanType | boolean
@@ -21,7 +32,7 @@ timespan | n | TimestampType | timestamp
 minute | u | IntegerType | int | range between 0 and 1439
 second | v | IntegerType | int | range between 0 and 86399
 
-# Simple example
+## Simple example
 
 Start q to listen on port 5000:
 ```
