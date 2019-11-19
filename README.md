@@ -1,4 +1,4 @@
-# kdbds_2_3_1  
+# kdb+ Datasource (V2) for Spark 2.4.4+
 
 kdb+ | Code | Spark | Alias | Note
 -- | -- | -- | -- | --
@@ -32,10 +32,10 @@ q)
 
 Start the Spark shell, and 
 ```
-$ ./bin/spark-shell --jars kdbds_2_3_1.jar
-scala> val df = spark.read.format("KdbDataSource").
+$ ./bin/spark-shell --jars kdbds.jar
+scala> val df = spark.read.format("kdb").
    | option("host", "localhost").option("port", 5000).
-   | schema("id long").option("q", "([] id:til 5)").load
+   | schema("id long").option("qexpr", "([] id:til 5)").load
 df: org.apache.spark.sql.DataFrame = [id: bigint]   
 scala> df.show(false)
 +---+
