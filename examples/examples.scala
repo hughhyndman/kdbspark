@@ -23,7 +23,7 @@ val dfBasic = spark.read.
 	option("host", HOST).
 	option("port", PORT).
 	schema("id long"). // Must provide a schema for q expressions
-	option("q", "([] id:til 10)"). // Expression must return an unkeyed table
+	option("qexpr", "([] id:til 10)"). // Expression must return an unkeyed table
 	load
 
 dfBasic.show
@@ -211,7 +211,7 @@ dfLarge.createOrReplaceTempView("tblLarge")
 spark.sql("select * from tblLarge where icolumn>1000 and icolumn<1050").show
 
 
-//TODO: Show more write examples (with commit and abort)
+/*TODO: Show more write examples (with commit and abort)
 dfCommonTypes.write.
 	format("kdb").
 	option("host", HOST).
@@ -220,3 +220,4 @@ dfCommonTypes.write.
 	option("function", "testWrite").
 	option("writeaction", "append").
 	save
+*/

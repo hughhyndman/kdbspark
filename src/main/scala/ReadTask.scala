@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 import org.apache.spark.sql.sources.v2.reader._
 import org.apache.spark.sql.sources.v2.DataSourceOptions
 import org.apache.spark.sql.types._
@@ -26,26 +25,26 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.log4j.Logger
 
 import java.nio.charset.StandardCharsets
-import java.sql.{Timestamp => JTimestamp, Date => JDate, Time => JTime}
+import java.sql.{Timestamp => JTimestamp, Date => JDate}
 import java.util.UUID
-import java.util.Map
+import java.util
 
 
 /*
  * Class that is instantiated on an executor to read data from kdb+
  */
 class ReadTask(
-      optionmap: Map[String,String], 
+      optionmap: util.Map[String,String],
       filters: Array[Object],
       schema: StructType) 
     extends InputPartition[ColumnarBatch] with InputPartitionReader[ColumnarBatch] {
   @transient lazy val options = new DataSourceOptions(optionmap)
-  @transient lazy val log = org.apache.log4j.Logger.getLogger("kdbdr")
+  @transient lazy val log: Logger = Logger.getLogger("kdb")
   Util.setLevel(options, log) 
 
-  var numrows = -1 // Indicates that query not run yet
-  var coldata: Array[Object] = null // Column data from kdb+ query
-  var colnames: Array[String] = null // Column names from kdb+ query  
+  var numrows: Integer = -1 // Indicates that query not run yet
+  var coldata: Array[Object] = _ // Column data from kdb+ query
+  var colnames: Array[String] = _ // Column names from kdb+ query
 
   var index = 0
   
@@ -59,7 +58,7 @@ class ReadTask(
   override def next(): Boolean = {
     log.debug("next()")
     if (numrows == -1) {   
-      val obj = CallKdb.query(optionmap, filters, schema)
+      val obj = KdbCall.query(optionmap, filters, schema)
       
       /*
        * The flip object has an array of column names, and an array of arrays containing column data	
@@ -70,7 +69,7 @@ class ReadTask(
       numrows = c.n(flip) 
       index = 0
       
-      if (log.isDebugEnabled()) {
+      if (log.isDebugEnabled) {
         log.debug("  #rows: " + numrows)
         log.debug("  cols:  " + colnames.mkString(","))
       }
@@ -89,32 +88,32 @@ class ReadTask(
     /*
      * Place data received from kdb+ into appropriate column vector. Kdb+ may not
      * have pruned the columns and provided more data, so we want to make sure that
-     * select only what we need from the result
+     * we select only what we need from the result
      */
-    var acv = new Array[ColumnVector](schema.length)  
+    val acv = new Array[ColumnVector](schema.length)
     for (colind <- 0 until schema.length) { 
       val ind = colnames.indexOf(schema(colind).name)
       acv(colind) = populateColumn(schema(colind), numrows, coldata(ind))
       coldata(ind) = null // Free space; we don't need this now
     }    
-    var batch = new ColumnarBatch(acv)
+    val batch = new ColumnarBatch(acv)
     
     batch.setNumRows(numrows)
     batch
   }
   
   /*
-   * Populate a Spark dataframe column with kdb+ column data <cd>, which has schema
+   * Populate a Spark data frame column with kdb+ column data <cd>, which has schema
    * properties defined in <sf> 
    */
   private def populateColumn(sf: StructField, numrows: Int, cd: Object): OnHeapColumnVector = {
     val datatype = sf.dataType
     val nullable = sf.nullable
-    var cv = new OnHeapColumnVector(numrows, datatype)
+    val cv = new OnHeapColumnVector(numrows, datatype)
     
     /*
      * Convert and place column data into Spark columnar storage. Comments provide
-     * kdb+ data type being processed
+     * the single character kdb+ data type being processed
      */
     datatype match {
       /* Scalar Types */
@@ -122,15 +121,15 @@ class ReadTask(
         case a:Array[Char] => putChars(cv, numrows, a)  // c
         case a:Array[String] => putStrings(cv, numrows, a, nullable) // s
         case a:Array[Object] => a(0) match { // Determine type from first row
-          case s:Array[Char] => putArrayChars(numrows, a, cv, nullable) // C
-          case s:UUID => putUUIDs(numrows, a, cv, nullable) // g
+          case _:Array[Char] => putArrayChars(numrows, a, cv, nullable) // C
+          case _:UUID => putUUIDs(numrows, a, cv, nullable) // g
         }
       }
       case BooleanType => putBooleans(cv, numrows, cd.asInstanceOf[Array[Boolean]]) // b
       case ByteType => cv.putBytes(0, numrows, cd.asInstanceOf[Array[Byte]], 0) // x
       case ShortType => putShorts(numrows, cd.asInstanceOf[Array[Short]], cv, nullable) // h
       case IntegerType => cd match {
-        case a:Array[Int] => putInts(numrows, a, /* cd.asInstanceOf[Array[Int]], */ cv, nullable) // i
+        case a:Array[Int] => putInts(numrows, a, cv, nullable) // i
         case a:Array[c.Minute] => putInts(numrows, a, cv, nullable) // u
         case a:Array[c.Second] => putInts(numrows, a, cv, nullable) // v
       }
@@ -147,87 +146,86 @@ class ReadTask(
         case a:Array[c.Month] => putMonths(numrows, a, cv, nullable) // m
       }
       /* Array Types */
-      case CallKdb.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
-      case CallKdb.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
-      case CallKdb.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
-      case CallKdb.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
-      case CallKdb.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
-      case CallKdb.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
-      case CallKdb.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
-      case CallKdb.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
-      /* Map Types */
-//TODO: Implement support to map kdb+ dictionary -> Spark maps
-      case _ => throw new Exception("Unsupported data type" + datatype) 
+      case Type.BooleanArrayType => putBooleanArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // B
+      case Type.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
+      case Type.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
+      case Type.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
+      case Type.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
+      case Type.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
+      case Type.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
+      case Type.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
+      case Type.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
+      case _ => throw new Exception("Unsupported data type: " + datatype)
     } 
     cv
   }
   
   /*
-   * The functions below place the kdb+ column data (cd) into the Spark column storage (cv)
+   * The functions below place the kdb+ column data <cd> into the Spark column storage <cv>
    */
   
-  private def putChars(cv: OnHeapColumnVector, numrows: Int, cd: Array[Char]) = {
+  private def putChars(cv: OnHeapColumnVector, numrows: Int, cd: Array[Char]): Unit = {
     val bytes = cd.mkString.getBytes(StandardCharsets.UTF_8)        
     for (rowind <- 0 until numrows) {
       cv.putByteArray(rowind, bytes, rowind, 1)
     }
   }
    
-  private def putStrings(cv: OnHeapColumnVector, numrows: Int, cd: Array[String], nullable: Boolean) = {
+  private def putStrings(cv: OnHeapColumnVector, numrows: Int, cd: Array[String], nullable: Boolean): Unit = {
     for (rowind <- 0 until numrows) {
       val b = cd(rowind).getBytes(StandardCharsets.UTF_8)
       cv.putByteArray(rowind, b, 0, b.length)     
-      if (nullable & b.length == 0)
+      if (nullable & b.isEmpty)
         cv.putNull(rowind)
     }
   }
  
-  private def putShorts(numrows: Int, cd: Array[Short], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putShorts(numrows: Int, cd: Array[Short], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     cv.putShorts(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == CallKdb.ShortNull)
+        if (cd(rowind) == Type.ShortNull)
           cv.putNull(rowind)      
     }
   }   
   
-  private def putInts(numrows: Int, cd: Array[Int], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putInts(numrows: Int, cd: Array[Int], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     cv.putInts(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == CallKdb.IntNull)
+        if (cd(rowind) == Type.IntNull)
           cv.putNull(rowind)
     }
   }
   
-  private def putInts(numrows: Int, cd: Array[c.Minute], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putInts(numrows: Int, cd: Array[c.Minute], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     for (rowind <- 0 until numrows) {
       val minute = cd(rowind).i
       cv.putInt(rowind, minute)
-      if (nullable && minute == CallKdb.IntNull)
+      if (nullable && minute == Type.IntNull)
         cv.putNull(rowind)
     }
   }
   
-  private def putInts(numrows: Int, cd: Array[c.Second], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putInts(numrows: Int, cd: Array[c.Second], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     for (rowind <- 0 until numrows) {
       val second = cd(rowind).i
       cv.putInt(rowind, second)
-      if (nullable && second == CallKdb.IntNull)
+      if (nullable && second == Type.IntNull)
         cv.putNull(rowind)
     }
   }
   
-  private def putLongs(numrows: Int, cd: Array[Long], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putLongs(numrows: Int, cd: Array[Long], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     cv.putLongs(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == CallKdb.LongNull)
+        if (cd(rowind) == Type.LongNull)
           cv.putNull(rowind)
     }
   }          
           
-  private def putFloats(numrows: Int, cd: Array[Float], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putFloats(numrows: Int, cd: Array[Float], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     cv.putFloats(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
@@ -236,7 +234,7 @@ class ReadTask(
     }
   }
   
-  private def putDoubles(numrows: Int, cd: Array[Double], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putDoubles(numrows: Int, cd: Array[Double], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     cv.putDoubles(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
@@ -245,74 +243,74 @@ class ReadTask(
     }
   }
   
-  private def putTimestamps(numrows: Int, cd: Array[JTimestamp], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putTimestamps(numrows: Int, cd: Array[JTimestamp], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     for (rowind <- 0 until numrows) {
       val time = cd(rowind).getTime
       cv.putLong(rowind, 1000 * time)
-      if (nullable && time == CallKdb.LongNull)
+      if (nullable && time == Type.LongNull)
         cv.putNull(rowind)
     }
   }
    
-  private def putTimestamps(numrows: Int, cd: Array[java.util.Date], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putTimestamps(numrows: Int, cd: Array[java.util.Date], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     for (rowind <- 0 until numrows) {
       val time = cd(rowind).getTime
       cv.putLong(rowind, 1000 * time)
-      if (nullable && time == CallKdb.LongNull)
+      if (nullable && time == Type.LongNull)
         cv.putNull(rowind)
     }
   }
   
-  private def putTimestamps(numrows: Int, cd: Array[c.Timespan], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putTimestamps(numrows: Int, cd: Array[c.Timespan], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     for (rowind <- 0 until numrows) {
       val span = cd(rowind).j / 1000 // Spark only supports up to microseconds
       cv.putLong(rowind, span)
-      if (nullable && cd(rowind).j == CallKdb.LongNull)
+      if (nullable && cd(rowind).j == Type.LongNull)
         cv.putNull(rowind)
     }
   }
   
-  private def putBooleans(cv: OnHeapColumnVector, numrows: Int, cd: Array[Boolean]) = {
+  private def putBooleans(cv: OnHeapColumnVector, numrows: Int, cd: Array[Boolean]): Unit = {
     for (rowind <- 0 until numrows) {
       cv.putBoolean(rowind, cd(rowind))
     }
   }
   
-  private def putArrayChars(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putArrayChars(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
    for (rowind <- 0 until numrows) {
       val bytes = cd(rowind).asInstanceOf[Array[Char]].mkString.getBytes(StandardCharsets.UTF_8)
       cv.putByteArray(rowind, bytes, 0, bytes.length)
 
-      if (nullable && bytes.length == 0)
+      if (nullable && bytes.isEmpty)
         cv.putNull(rowind)
     }
   }
 
-  private def putUUIDs(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putUUIDs(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
    for (rowind <- 0 until numrows) {
       val uuid = cd(rowind).asInstanceOf[UUID]
       val bytes = uuid.toString.getBytes()
       cv.putByteArray(rowind, bytes, 0, bytes.length)
 
-      if (nullable && 0 == uuid.compareTo(CallKdb.UUIDNull))
+      if (nullable && 0 == uuid.compareTo(Type.UUIDNull))
         cv.putNull(rowind)
     }
   }
   
-  private def putDates(numrows: Int, cd: Array[JDate], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putDates(numrows: Int, cd: Array[JDate], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day    
     for (rowind <- 0 until numrows) {
       cv.putInt(rowind, (cd(rowind).getTime / oneday).asInstanceOf[Int])
-      if (nullable && cd(rowind).getTime == CallKdb.LongNull)
+      if (nullable && cd(rowind).getTime == Type.LongNull)
         cv.putNull(rowind)
     }  
   }
   
-  private def putMonths(numrows: Int, cd: Array[c.Month], cv: OnHeapColumnVector, nullable: Boolean) = {
-    var date = java.util.Calendar.getInstance
+  private def putMonths(numrows: Int, cd: Array[c.Month], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
+    val date = java.util.Calendar.getInstance
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day   
     for (rowind <- 0 until numrows) {
-      if (nullable && cd(rowind).i == CallKdb.IntNull)
+      if (nullable && cd(rowind).i == Type.IntNull)
         cv.putNull(rowind)
       else {
         date.set(2000 + cd(rowind).i / 12, cd(rowind).i % 12, 1, 0, 0, 0)
@@ -321,9 +319,9 @@ class ReadTask(
     }    
   }
   
-  private def putArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean) = {
-    val numelem = 0;
-    var len = 0;
+  private def putArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
+    var numelem = 0
+    var len = 0
     
     for (rowind <- 0 until numrows) {
       cd(rowind) match {
@@ -333,17 +331,39 @@ class ReadTask(
         case a:Array[Long] => len = a.length; cv.arrayData.appendLongs(len, a, 0)
         case a:Array[Float] => len = a.length; cv.arrayData.appendFloats(len, a, 0)
         case a:Array[Double] => len = a.length; cv.arrayData.appendDoubles(len, a, 0)
-      }     
+      }
+
       cv.putArray(rowind, numelem, len)
+      numelem += len
             
       if (nullable && len == 0)
         cv.putNull(rowind)
     }
   }
 
-  private def putTimestampArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean) = {
+
+  private def putBooleanArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     var numelem = 0
-    var len = 0
+
+    for (rowind <- 0 until numrows) {
+      val b = cd(rowind).asInstanceOf[Array[Boolean]]
+      val len = b.length
+
+      val ad = cv.arrayData()
+      for (i <- 0 until len)
+        ad.appendBoolean(b(i))
+
+      cv.putArray(rowind, numelem, len)
+      numelem += len
+
+      if (nullable && len == 0)
+        cv.putNull(rowind)
+    }
+  }
+
+
+  private def putTimestampArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
+    var numelem = 0
     
     for (rowind <- 0 until numrows) {
       val ts = cd(rowind).asInstanceOf[Array[JTimestamp]]
@@ -361,11 +381,10 @@ class ReadTask(
     }
   }
     
-  private def putDateArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean) = {
+  private def putDateArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day  
     
     var numelem = 0
-    var len = 0
     
     for (rowind <- 0 until numrows) {
       val d = cd(rowind).asInstanceOf[Array[JDate]]

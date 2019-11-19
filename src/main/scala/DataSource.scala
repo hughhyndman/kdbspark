@@ -48,7 +48,7 @@ import scala.collection.mutable.Map._
 import scala.collection.mutable.{Map => MMap}
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
-import java.util.Map
+import java.util
 
 /* The name of this class is the argument to the format function in Spark */
 class kdb extends DataSourceV2
@@ -74,16 +74,17 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     with SupportsScanColumnarBatch 
     with SupportsPushDownFilters
     with SupportsPushDownRequiredColumns {
-  val log = Logger.getLogger("kdbdr")
+  val log: Logger = Logger.getLogger("kdb")
   Util.setLevel(options, log)
-  
+
+  /* Dump out all option settings if in debug mode */
   if (log.isDebugEnabled) {
     log.debug("KdbDataSourceReader()")
     for ((k,v) <- options.asMap) 
        log.debug(s"  $k: $v")
   }
     
-  val qExprProvided = options.get("q").orElse("").length > 0
+  val qExprProvided: Boolean = options.get(Opt.QEXPR).orElse("").length > 0
   
   var filters = new Array[Filter](0)   
   var kdbFilters = new Array[Object](0)  
@@ -116,18 +117,18 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   }
   
   /*
-   * Determine which filters can be pushed down to kdb+
+   * Pushes down filters, and returns filters that need to be evaluated after scanning.
    */
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
     if (log.isDebugEnabled) {
-      log.debug("pushFilters()")
+      log.debug("KdbDataSourceReader.pushFilters()")
       filters.foreach(f => log.debug("  " + f.toString))
     }
 
     kdbFilters = new Array[Object](0) // Array of pushdown filters to be serialized to kdb+
     var supported = Array.empty[Filter] // Filters which kdb+ can support    
     
-    /* If kdb+ can't support push-down filters, get Spark to do it */
+    /* If the kdb+ function doesn't support push-down filters, get Spark to do it */
     if (!canPushFilters) {
       this.filters = supported
       return filters
@@ -152,10 +153,13 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     unsupported
   }
 
-  /* Return whether the kdb+ function can support push-down filters */
+  /*
+   * Return whether the kdb+ host supports push-down filters
+   */
   private def canPushFilters: Boolean = {
-    options.getBoolean("pushFilters", true) && // if Spark caller specified option 
-      !qExprProvided // and Q expression not provided
+    options.getBoolean(Opt.PUSHFILTERS, Opt.PUSHFILTERSDEF) &&
+      !qExprProvided &&
+      !options.get(Opt.TABLE).isPresent
   }
      
   /*
@@ -163,31 +167,31 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
    */
  //! Supports ScanColumnar
   override def planBatchInputPartitions: JList[InputPartition[ColumnarBatch]] = {
-      log.debug("createBatchDataReaderFactories()")
-      val numparts = options.getInt("numPartitions", 1) // Number of partitions
+      log.debug("KdbDataSourceReader.createBatchDataReaderFactories()")
+      val numparts = options.getInt(Opt.NUMPARTITIONS, Opt.NUMPARTITIONSDEF) // Number of partitions
 
       var rts = new ArrayList[InputPartition[ColumnarBatch]]      
       for (pid <- 0 until numparts) {
         var optionmap = options.asMap // Make copy of mutable map from options
-        optionmap.put("partitionid", pid.toString)
+        optionmap.put(Opt.PARTITIONID, pid.toString)
         rts.add(new ReadTask(optionmap, kdbFilters, readSchema))       
       }
 
       rts
   }
-
+  
   /*
    * Interrogates kdb+ for the schema (meta data) of the query
    */
   def getQuerySchema: StructType = {
-    var optionmap = options.asMap // Get copy of mutable map out of options
-    optionmap.put("partitionid", "-1") // Insert special partition ID indicating schema query  
+    val optionmap = options.asMap // Get copy of mutable map out of options
+    optionmap.put(Opt.PARTITIONID, Opt.SCHEMAREQ) // Insert special partition ID indicating schema query
 
-    val obj = CallKdb.schema(optionmap) // Call kdb+ to get schema
+    val obj = KdbCall.schema(optionmap) // Call kdb+ to get schema
         
-    /* The schema information is in the form of the result of 0!meta[table] */
+    /* The schema information is in the form of the result of kdb's 0!meta[table] */
     val flip = obj.asInstanceOf[c.Flip]
-    val metaNames = flip.x.asInstanceOf[Array[String]]
+    val metaNames = flip.x
     val cols = flip.y(metaNames.indexOf("c")).asInstanceOf[Array[String]]
     val types = flip.y(metaNames.indexOf("t")).asInstanceOf[Array[Char]]
     
@@ -199,14 +203,14 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
       new Array[Boolean](cols.length) // Default is false
     
     /* Create schema from meta received from kdb+ */
-    var fields = new Array[StructField](cols.length)
-    for (i <- 0 until cols.length)
-      fields(i) = new StructField(cols(i), CallKdb.mapDataType(types(i)), nullables(i))
+    val fields = new Array[StructField](cols.length)
+    for (i <- cols.indices)
+      fields(i) = StructField(cols(i), Type.mapDataType(types(i)), nullables(i))
     new StructType(fields)    
   }  
   
   /*
-   * Convert pushdown Filter instances into objects that can be serialized to kdb+
+   * Convert pushdown filter instances into objects that can be serialized to kdb+
    */
   def convFilter(f: Filter): Object = f match {
     case EqualTo(attribute, value) => Array("eq", attribute, value)
@@ -234,18 +238,19 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   
   /* Convert conjunction filter (ie, and/or) */
   def convConjFilter(op: String, l: Filter, r: Filter): Object = {
-    val lo = convFilter(l); val ro = convFilter(r)
+    val lo = convFilter(l)
+    val ro = convFilter(r)
     if (lo != null && ro != null) Array(op, lo, ro) else null
   }
 }
 
 class KdbDataSourceWriter(jobid: String, schema: StructType, mode: SaveMode, options: DataSourceOptions) extends DataSourceWriter {
-  val log = Logger.getLogger("kdbdw")
+  val log: Logger = Logger.getLogger("kdb")
   Util.setLevel(options, log) 
   
-  var optionmap = options.asMap
-  optionmap.put("jobID", jobid)
-  optionmap.put("mode", mode.toString)
+  var optionmap: util.Map[String, String] = options.asMap
+  optionmap.put(Opt.JOBID, jobid)
+  optionmap.put(Opt.MODE, mode.toString)
   
   if (log.isDebugEnabled) {
     log.debug("KdbDataSourceWriter()")
@@ -270,7 +275,7 @@ class KdbDataSourceWriter(jobid: String, schema: StructType, mode: SaveMode, opt
   }  
 }
 
-class KdbDataWriterFactory(jobid: String, schema: StructType, mode: SaveMode, optionmap: Map[String,String]) extends DataWriterFactory[InternalRow] { 
+class KdbDataWriterFactory(jobid: String, schema: StructType, mode: SaveMode, optionmap: util.Map[String, String]) extends DataWriterFactory[InternalRow] {
   override def createDataWriter(partitionId: Int, taskId: Long, epochId: Long): DataWriter[InternalRow] = {
     new WriteTask(partitionId, taskId, epochId, jobid, schema, mode, optionmap)
   }
