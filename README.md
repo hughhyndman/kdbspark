@@ -1,4 +1,6 @@
-# kdb+ Data Source (V2) for Spark 2.4.4+
+# Spark Data Source (V2) for Kx Systems kdb+ Database
+
+For Spark 2.4.4 and upwards
 
 ## Task List
 
