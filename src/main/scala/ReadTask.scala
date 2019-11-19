@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-package com.kx.spark
 
 import org.apache.spark.sql.sources.v2.reader._
 import org.apache.spark.sql.sources.v2.DataSourceOptions

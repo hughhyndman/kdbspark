@@ -18,7 +18,7 @@
 // SPARK-24073 renames DataReaderFactory -> InputPartition and DataReader -> InputPartitionReader.
 // Some classes still reflects the old name and causes confusion.
 
-package com.kx.spark
+
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.SQLContext
@@ -50,7 +50,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import java.util.Map
 
-class KdbDataSource extends DataSourceV2 
+class KdbDataSource extends DataSourceV2
     with ReadSupport
     with WriteSupport
 //    with ReadSupportWithSchema

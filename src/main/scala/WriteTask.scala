@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-package com.kx.spark
 
 import java.sql.{Timestamp => JTimestamp, Date => JDate}
 import java.util.Map
