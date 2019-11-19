@@ -79,19 +79,19 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
       batch(i) match { 
         case a:Array[Boolean] => a(batchind) = row.getBoolean(i)
         case a:Array[Byte] => a(batchind) = row.getByte(i) //! row.getAs[Byte](i)
-        case a:Array[Short] => a(batchind) = if (nn) row.getShort(i) else Kdb.ShortNull
-        case a:Array[Int] => a(batchind) = if (nn) row.getInt(i) else Kdb.IntNull
-        case a:Array[Long] => a(batchind) = if (nn) row.getLong(i) else Kdb.LongNull
-        case a:Array[Float] => a(batchind) = if (nn) row.getFloat(i) else Kdb.FloatNull
-        case a:Array[Double] => a(batchind) = if (nn) row.getDouble(i) else Kdb.DoubleNull
-        case a:Array[JTimestamp] => a(batchind) = if (nn) new JTimestamp(row.getLong(i) / 1000) else Kdb.TimestampNull
+        case a:Array[Short] => a(batchind) = if (nn) row.getShort(i) else CallKdb.ShortNull
+        case a:Array[Int] => a(batchind) = if (nn) row.getInt(i) else CallKdb.IntNull
+        case a:Array[Long] => a(batchind) = if (nn) row.getLong(i) else CallKdb.LongNull
+        case a:Array[Float] => a(batchind) = if (nn) row.getFloat(i) else CallKdb.FloatNull
+        case a:Array[Double] => a(batchind) = if (nn) row.getDouble(i) else CallKdb.DoubleNull
+        case a:Array[JTimestamp] => a(batchind) = if (nn) new JTimestamp(row.getLong(i) / 1000) else CallKdb.TimestampNull
 //! Somehow the TZ crept in below
-        case a:Array[JDate] => a(batchind) = if (nn) new JDate(row.getLong(i) * oneday) else Kdb.DateNull
+        case a:Array[JDate] => a(batchind) = if (nn) new JDate(row.getLong(i) * oneday) else CallKdb.DateNull
         
         case a:Array[Object] => a(batchind) = 
           schema(i).dataType match {
-            case StringType => if (nn) row.getString(i).toCharArray.asInstanceOf[Object] else Kdb.StringNull
-            case Kdb.LongArrayType => row.getArray(i).asInstanceOf[WrappedArray[Array[Long]]].array
+            case StringType => if (nn) row.getString(i).toCharArray.asInstanceOf[Object] else CallKdb.StringNull
+            case CallKdb.LongArrayType => row.getArray(i).asInstanceOf[WrappedArray[Array[Long]]].array
             
  /*
             case Kdb.ByteArrayType => row(i).asInstanceOf[WrappedArray[Array[Byte]]].array
@@ -135,7 +135,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
   private def writeBatch(disp: String): Unit = {
     optionmap.put("writeaction", disp) 
     optionmap.put("batchcount", batchCount.toString)
-    Kdb.write(optionmap, schema, batch)
+    CallKdb.write(optionmap, schema, batch)
     rowCount += batchind
     log.debug(s"Batches written: $batchCount; Rows written: $rowCount")    
   }
@@ -171,14 +171,14 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
       case StringType => new Array[Object](bs)
       case TimestampType => new Array[JTimestamp](bs)
       case DateType => new Array[JDate](bs)
-      case Kdb.ByteArrayType => new Array[Object](bs)
-      case Kdb.ShortArrayType => new Array[Object](bs)
-      case Kdb.IntegerArrayType => new Array[Object](bs)
-      case Kdb.LongArrayType => new Array[Object](bs) 
-      case Kdb.FloatArrayType => new Array[Object](bs) 
-      case Kdb.DoubleArrayType => new Array[Object](bs) 
-      case Kdb.TimestampArrayType => new Array[Object](bs)
-      case Kdb.DateArrayType => new Array[Object](bs)
+      case CallKdb.ByteArrayType => new Array[Object](bs)
+      case CallKdb.ShortArrayType => new Array[Object](bs)
+      case CallKdb.IntegerArrayType => new Array[Object](bs)
+      case CallKdb.LongArrayType => new Array[Object](bs)
+      case CallKdb.FloatArrayType => new Array[Object](bs)
+      case CallKdb.DoubleArrayType => new Array[Object](bs)
+      case CallKdb.TimestampArrayType => new Array[Object](bs)
+      case CallKdb.DateArrayType => new Array[Object](bs)
       case _ => throw new Exception("Unsupported data type:" + dt)
     }
   }

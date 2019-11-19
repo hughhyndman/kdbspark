@@ -59,7 +59,7 @@ class ReadTask(
   override def next(): Boolean = {
     log.debug("next()")
     if (numrows == -1) {   
-      val obj = Kdb.query(optionmap, filters, schema)
+      val obj = CallKdb.query(optionmap, filters, schema)
       
       /*
        * The flip object has an array of column names, and an array of arrays containing column data	
@@ -147,14 +147,14 @@ class ReadTask(
         case a:Array[c.Month] => putMonths(numrows, a, cv, nullable) // m
       }
       /* Array Types */
-      case Kdb.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
-      case Kdb.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
-      case Kdb.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
-      case Kdb.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
-      case Kdb.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
-      case Kdb.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
-      case Kdb.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
-      case Kdb.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
+      case CallKdb.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
+      case CallKdb.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
+      case CallKdb.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
+      case CallKdb.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
+      case CallKdb.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
+      case CallKdb.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
+      case CallKdb.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
+      case CallKdb.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
       /* Map Types */
 //TODO: Implement support to map kdb+ dictionary -> Spark maps
       case _ => throw new Exception("Unsupported data type" + datatype) 
@@ -186,7 +186,7 @@ class ReadTask(
     cv.putShorts(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == Kdb.ShortNull)
+        if (cd(rowind) == CallKdb.ShortNull)
           cv.putNull(rowind)      
     }
   }   
@@ -195,7 +195,7 @@ class ReadTask(
     cv.putInts(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == Kdb.IntNull)
+        if (cd(rowind) == CallKdb.IntNull)
           cv.putNull(rowind)
     }
   }
@@ -204,7 +204,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val minute = cd(rowind).i
       cv.putInt(rowind, minute)
-      if (nullable && minute == Kdb.IntNull)
+      if (nullable && minute == CallKdb.IntNull)
         cv.putNull(rowind)
     }
   }
@@ -213,7 +213,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val second = cd(rowind).i
       cv.putInt(rowind, second)
-      if (nullable && second == Kdb.IntNull)
+      if (nullable && second == CallKdb.IntNull)
         cv.putNull(rowind)
     }
   }
@@ -222,7 +222,7 @@ class ReadTask(
     cv.putLongs(0, numrows, cd, 0)
     if (nullable) {
       for (rowind <- 0 until numrows)
-        if (cd(rowind) == Kdb.LongNull)
+        if (cd(rowind) == CallKdb.LongNull)
           cv.putNull(rowind)
     }
   }          
@@ -249,7 +249,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val time = cd(rowind).getTime
       cv.putLong(rowind, 1000 * time)
-      if (nullable && time == Kdb.LongNull)
+      if (nullable && time == CallKdb.LongNull)
         cv.putNull(rowind)
     }
   }
@@ -258,7 +258,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val time = cd(rowind).getTime
       cv.putLong(rowind, 1000 * time)
-      if (nullable && time == Kdb.LongNull)
+      if (nullable && time == CallKdb.LongNull)
         cv.putNull(rowind)
     }
   }
@@ -267,7 +267,7 @@ class ReadTask(
     for (rowind <- 0 until numrows) {
       val span = cd(rowind).j / 1000 // Spark only supports up to microseconds
       cv.putLong(rowind, span)
-      if (nullable && cd(rowind).j == Kdb.LongNull)
+      if (nullable && cd(rowind).j == CallKdb.LongNull)
         cv.putNull(rowind)
     }
   }
@@ -294,7 +294,7 @@ class ReadTask(
       val bytes = uuid.toString.getBytes()
       cv.putByteArray(rowind, bytes, 0, bytes.length)
 
-      if (nullable && 0 == uuid.compareTo(Kdb.UUIDNull))
+      if (nullable && 0 == uuid.compareTo(CallKdb.UUIDNull))
         cv.putNull(rowind)
     }
   }
@@ -303,7 +303,7 @@ class ReadTask(
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day    
     for (rowind <- 0 until numrows) {
       cv.putInt(rowind, (cd(rowind).getTime / oneday).asInstanceOf[Int])
-      if (nullable && cd(rowind).getTime == Kdb.LongNull)
+      if (nullable && cd(rowind).getTime == CallKdb.LongNull)
         cv.putNull(rowind)
     }  
   }
@@ -312,7 +312,7 @@ class ReadTask(
     var date = java.util.Calendar.getInstance
     val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day   
     for (rowind <- 0 until numrows) {
-      if (nullable && cd(rowind).i == Kdb.IntNull)
+      if (nullable && cd(rowind).i == CallKdb.IntNull)
         cv.putNull(rowind)
       else {
         date.set(2000 + cd(rowind).i / 12, cd(rowind).i % 12, 1, 0, 0, 0)

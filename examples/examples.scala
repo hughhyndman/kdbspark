@@ -23,7 +23,7 @@ val dfBasic = spark.read.
 	option("host", HOST).
 	option("port", PORT).
 	schema("id long"). // Must provide a schema for q expressions
-	option("qexpr", "([] id:til 10)"). // Expression must return an unkeyed table
+	option("q", "([] id:til 10)"). // Expression must return an unkeyed table
 	load
 
 dfBasic.show

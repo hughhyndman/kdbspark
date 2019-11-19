@@ -50,7 +50,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import java.util.Map
 
-class KdbDataSource extends DataSourceV2
+/* The name of this class is the argument to the format function in Spark */
+class kdb extends DataSourceV2
     with ReadSupport
     with WriteSupport
 //    with ReadSupportWithSchema
@@ -182,7 +183,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     var optionmap = options.asMap // Get copy of mutable map out of options
     optionmap.put("partitionid", "-1") // Insert special partition ID indicating schema query  
 
-    val obj = Kdb.schema(optionmap) // Call kdb+ to get schema
+    val obj = CallKdb.schema(optionmap) // Call kdb+ to get schema
         
     /* The schema information is in the form of the result of 0!meta[table] */
     val flip = obj.asInstanceOf[c.Flip]
@@ -200,7 +201,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     /* Create schema from meta received from kdb+ */
     var fields = new Array[StructField](cols.length)
     for (i <- 0 until cols.length)
-      fields(i) = new StructField(cols(i), Kdb.mapDataType(types(i)), nullables(i))    
+      fields(i) = new StructField(cols(i), CallKdb.mapDataType(types(i)), nullables(i))
     new StructType(fields)    
   }  
   
