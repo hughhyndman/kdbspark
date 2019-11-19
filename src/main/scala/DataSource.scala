@@ -19,34 +19,18 @@
 // Some classes still reflects the old name and causes confusion.
 
 
-
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.sources.v2._
 import org.apache.spark.sql.sources.v2.reader._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.RowFactory
 import org.apache.spark.sql.SaveMode
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
-import org.apache.spark.sql.vectorized.ColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
-import org.apache.spark.sql.sources.v2.reader.partitioning
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.sources.v2.writer._
 import org.apache.spark.sql.catalyst.InternalRow
-
 import org.apache.log4j.Logger
-
 import java.util.{ArrayList, List => JList, Optional}
-import java.nio.charset.StandardCharsets
-import java.sql.{Timestamp => JTimestamp, Date => JDate}
-
-import scala.collection.mutable.Map._
-import scala.collection.mutable.{Map => MMap}
-import scala.collection.mutable.ArrayBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import java.util
 
@@ -54,7 +38,6 @@ import java.util
 class kdb extends DataSourceV2
     with ReadSupport
     with WriteSupport
-//    with ReadSupportWithSchema
     with DataSourceRegister {
   /* create a reader instance with/without a user-provided schema */
   override def createReader(schema: StructType, options: DataSourceOptions) = new KdbDataSourceReader(schema, options)
@@ -170,16 +153,16 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
       log.debug("KdbDataSourceReader.createBatchDataReaderFactories()")
       val numparts = options.getInt(Opt.NUMPARTITIONS, Opt.NUMPARTITIONSDEF) // Number of partitions
 
-      var rts = new ArrayList[InputPartition[ColumnarBatch]]      
+      val rts = new ArrayList[InputPartition[ColumnarBatch]]
       for (pid <- 0 until numparts) {
         var optionmap = options.asMap // Make copy of mutable map from options
         optionmap.put(Opt.PARTITIONID, pid.toString)
-        rts.add(new ReadTask(optionmap, kdbFilters, readSchema))       
+        rts.add(new ReadTask(optionmap, kdbFilters, readSchema()))
       }
 
       rts
   }
-  
+
   /*
    * Interrogates kdb+ for the schema (meta data) of the query
    */
