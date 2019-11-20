@@ -10,11 +10,12 @@ For Spark 2.4.4 and upwards
 - [ ] Complete README
 - [ ] Deal with TODOs and //!
 
-
 ## Datatype support
 
+### Simple Types
+
 kdb+ | Code | Spark | Alias | Note
--- | -- | -- | -- | --
+:-- | :-: | :-- | :-- | :--
 boolean | b | BooleanType | boolean
 guid | g | StringType | string | xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 byte | x | ByteType | byte, tinyint
@@ -33,6 +34,25 @@ time | t | TimestampType | timestamp
 timespan | n | TimestampType | timestamp
 minute | u | IntegerType | int | range between 0 and 1439
 second | v | IntegerType | int | range between 0 and 86399
+
+### List Types
+
+kdb+ | Code | Spark | Alias | Note
+:-- | :-: | :-- | :-- | :--
+char[] | C | StringType | string
+byte[] | X | CreateArrayType(ByteType, false) | array<char>???
+short[] | H | CreateArrayType(ShortType, false) | array<short>
+int[] | I | CreateArrayType(IntegerType, false) | array<int>
+long[] | J | CreateArrayType(LongType, false) | array<long>
+real[] | E | CreateArrayType(FloatType, false) | array<float>
+float[] | F | CreateArrayType(DoubleType, false) | array<double>
+timestamp[] | P | CreateArrayType(TimestampType, false) | array<tmestamp>
+date[] | D | CreateArrayType(DateType, false) | array<date>
+
+Note that kdb+ uses the names `real` and `float` for 4-byte and 8-byte floating point respectively, which is contrary to how Spark names tham.
+
+
+
 
 ## Simple example
 
@@ -61,3 +81,25 @@ scala> df.show(false)
 |  4|
 +---+
 ```
+
+## Options
+
+The following options are used by the kdb+ data source. All other options are ignored unles the `function` option is specified.
+
+Option | Description | Notes
+:-- | :--- | :-- 
+host | Name or IP address of kdb+ process | localhost
+port | Port on which kdb+ process is listening | 5000
+userpass | user:password if kdb+ process requires authentication | (empty)
+timeout | Query timeout in seconds | 60
+usetls | Whether to use TLS | false
+numpartitions | Number of read partitions to create | 1
+loglevel | Log4J logging level (debug, trace, warn, error) | inherited from Spark
+qexpr | A q expression that returns a unkeyed table | Schema must be provided
+table | A kdb+ table name | kdbds prepends an unkey ("0!") to name
+function | A kdb+ function that supports the kdbds call interface | See section
+pushfilters | Whether kdb+ function supports push-down filters | true
+
+## Kdb+ Function Interface
+
+Describe here...
