@@ -18,12 +18,15 @@
 
 import org.apache.spark.sql.sources.v2._
 import org.apache.spark.sql.types._
-import scala.collection.JavaConversions.mapAsScalaMap
 
-import java.sql.{Timestamp => JTimestamp, Date => JDate}
+import scala.collection.JavaConversions.mapAsScalaMap
+import java.sql.{Date => JDate, Timestamp => JTimestamp}
 import java.util.UUID
 import java.lang.Math.max
 import java.lang.Boolean
+import java.io.IOException
+
+import c.KException
 
 import org.apache.log4j.{Level, Logger}
 
@@ -124,26 +127,28 @@ object KdbCall {
     else
       Array(fexpr.toCharArray, arg1, arg2)
 
-    val con = new c(host, port, userpass, useTLS)
-    con.setTimeout(timeout)
 
-    val platformTarget = optGet(options, "platformtarget", "")
-
-    if (platformTarget.length > 0) {
-      val queryObj = Array(".qrClient.request", req, platformTarget)
-      con.k(queryObj) // This is the query id of the query being executed
-      val obj = con.k() // Wait for return
-
-      val data = obj.asInstanceOf[Array[Object]] // Need to remove the 'qrResult' object from the front of the query
-      log.debug("data: " + java.util.Arrays.deepToString(data))
-
-      con.close()
-      data(1)
-    } else {
-      val res = con.k(req)
-      con.close()
-      res
+    /* Connect to kdb+ process. Log any exceptions to help the user diagnose issues */
+    var con: c = null
+    try {
+      con = new c(host, port, userpass, useTLS)
     }
+    catch {
+      case e: KException => {
+        log.error(s"Connection failed with kdb+ message: ${e.getMessage()}")
+        throw(e)
+      }
+      case e: IOException => {
+        log.error(s"Socket connection failed with message: ${e.getMessage()}")
+        throw(e)
+      }
+    }
+
+    con.s.setSoTimeout(timeout)
+
+    val res = con.k(req)
+    con.close()
+    res
   }
 
   def optGet(options: java.util.Map[String, String], key: String, default: String): String =
@@ -165,6 +170,7 @@ object KdbCall {
     /* Append options */
     for ((k, v) <- optionmap) {
       /* convert all keys to lower case and dictionary values to a convenient kdb+ datatype */
+      //TODO: Remove unecessary options (e.g., userpass, host, port, etc.)
       keys(i) = k.toLowerCase
       vals(i) = keys(i) match {
         case "loglevel" | "writeaction" => v

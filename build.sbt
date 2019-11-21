@@ -1,4 +1,4 @@
-name := "kdbds"
+name := "kdbspark"
 
 version := "0.1"
 

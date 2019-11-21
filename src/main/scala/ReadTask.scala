@@ -29,7 +29,6 @@ import java.sql.{Timestamp => JTimestamp, Date => JDate}
 import java.util.UUID
 import java.util
 
-
 /*
  * Class that is instantiated on an executor to read data from kdb+
  */

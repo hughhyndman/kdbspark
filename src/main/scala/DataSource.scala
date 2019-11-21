@@ -49,7 +49,7 @@ class kdb extends DataSourceV2
   }
   
   /* Short alias for data source name */
-  override def shortName(): String = "kdb" //TODO: Doesn't seem to work  
+  override def shortName(): String = "kdb" // Doesn't seem to work
 }
 
 class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions) 
