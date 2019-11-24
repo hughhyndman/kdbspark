@@ -1,12 +1,11 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * Copyright [2019] [Hugh Hyndman]
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,10 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-// SPARK-24073 renames DataReaderFactory -> InputPartition and DataReader -> InputPartitionReader.
-// Some classes still reflects the old name and causes confusion.
-
 
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.sources.v2._
@@ -68,7 +63,6 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   }
     
   val qExprProvided: Boolean = options.get(Opt.QEXPR).orElse("").length > 0
-  
   var filters = new Array[Filter](0)   
   var kdbFilters = new Array[Object](0)  
   var requiredSchema: StructType = _
@@ -104,7 +98,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
    */
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
     if (log.isDebugEnabled) {
-      log.debug("KdbDataSourceReader.pushFilters()")
+      log.debug("pushFilters()")
       filters.foreach(f => log.debug("  " + f.toString))
     }
 
@@ -148,9 +142,8 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   /*
    * Create as many read-task instances as specified by the <numPartitions> option
    */
- //! Supports ScanColumnar
   override def planBatchInputPartitions: JList[InputPartition[ColumnarBatch]] = {
-      log.debug("KdbDataSourceReader.createBatchDataReaderFactories()")
+      log.debug("planBatchInputPartitions()")
       val numparts = options.getInt(Opt.NUMPARTITIONS, Opt.NUMPARTITIONSDEF) // Number of partitions
 
       val rts = new ArrayList[InputPartition[ColumnarBatch]]

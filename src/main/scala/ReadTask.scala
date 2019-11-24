@@ -1,12 +1,11 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * Copyright [2019] [Hugh Hyndman]
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -92,6 +91,9 @@ class ReadTask(
     val acv = new Array[ColumnVector](schema.length)
     for (colind <- 0 until schema.length) { 
       val ind = colnames.indexOf(schema(colind).name)
+      if (ind == -1)
+        throw new Exception(s"Missing column '${schema(colind).name}' from kdb+ query")
+
       acv(colind) = populateColumn(schema(colind), numrows, coldata(ind))
       coldata(ind) = null // Free space; we don't need this now
     }    
@@ -109,6 +111,7 @@ class ReadTask(
     val datatype = sf.dataType
     val nullable = sf.nullable
     val cv = new OnHeapColumnVector(numrows, datatype)
+    var mismatch = false;
     
     /*
      * Convert and place column data into Spark columnar storage. Comments provide
@@ -116,34 +119,66 @@ class ReadTask(
      */
     datatype match {
       /* Scalar Types */
-      case StringType => cd match { 
-        case a:Array[Char] => putChars(cv, numrows, a)  // c
-        case a:Array[String] => putStrings(cv, numrows, a, nullable) // s
-        case a:Array[Object] => a(0) match { // Determine type from first row
-          case _:Array[Char] => putArrayChars(numrows, a, cv, nullable) // C
-          case _:UUID => putUUIDs(numrows, a, cv, nullable) // g
+      case StringType => cd match {
+        case a: Array[Char] => putChars(cv, numrows, a) // c
+        case a: Array[String] => putStrings(cv, numrows, a, nullable) // s
+        case a: Array[Object] => a(0) match { // Determine type from first row
+          case _: Array[Char] => putArrayChars(numrows, a, cv, nullable) // C
+          case _: UUID => putUUIDs(numrows, a, cv, nullable) // g
         }
+        case _ => mismatch = true
       }
-      case BooleanType => putBooleans(cv, numrows, cd.asInstanceOf[Array[Boolean]]) // b
-      case ByteType => cv.putBytes(0, numrows, cd.asInstanceOf[Array[Byte]], 0) // x
-      case ShortType => putShorts(numrows, cd.asInstanceOf[Array[Short]], cv, nullable) // h
+
+      case BooleanType => cd match {
+        case a: Array[Boolean] => putBooleans(cv, numrows, a) // b
+        case _ => mismatch = true
+      }
+
+      case ByteType => cd match {
+        case a: Array[Byte] => cv.putBytes(0, numrows, a, 0) // x
+        case _ => mismatch = true
+      }
+
+      case ShortType => cd match {
+        case a: Array[Short] => putShorts(numrows, a, cv, nullable) // h
+        case _ => mismatch = true
+      }
+
       case IntegerType => cd match {
         case a:Array[Int] => putInts(numrows, a, cv, nullable) // i
         case a:Array[c.Minute] => putInts(numrows, a, cv, nullable) // u
         case a:Array[c.Second] => putInts(numrows, a, cv, nullable) // v
+        case _ => mismatch = true
       }
-      case LongType => putLongs(numrows, cd.asInstanceOf[Array[Long]], cv, nullable)  // j
-      case FloatType => putFloats(numrows, cd.asInstanceOf[Array[Float]], cv, nullable) // e
-      case DoubleType => putDoubles(numrows, cd.asInstanceOf[Array[Double]], cv, nullable) // f
-      case TimestampType => cd match { 
+
+      case LongType => cd match {
+        case a: Array[Long] => putLongs(numrows, a, cv, nullable) // j
+        case _ => mismatch = true
+      }
+
+      case FloatType => cd match {
+        case a: Array[Float] => putFloats(numrows, a, cv, nullable) // e
+        case _ => mismatch = true
+      }
+
+      case DoubleType => cd match {
+        case a: Array[Double] => putDoubles(numrows, a, cv, nullable) // f
+        case _ => mismatch = true
+      }
+
+      case TimestampType => cd match {
         case a:Array[JTimestamp] => putTimestamps(numrows, a, cv, nullable) // p
         case a:Array[java.util.Date] => putTimestamps(numrows, a, cv, nullable) // t
         case a:Array[c.Timespan] => putTimestamps(numrows, a, cv, nullable) // n
+        case _ => mismatch = true
       }          
-      case DateType => cd match { 
+
+      case DateType => cd match {
         case a:Array[JDate] => putDates(numrows, a, cv, nullable)  // d
         case a:Array[c.Month] => putMonths(numrows, a, cv, nullable) // m
+        case _ => mismatch = true
       }
+
       /* Array Types */
       case Type.BooleanArrayType => putBooleanArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // B
       case Type.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
@@ -155,7 +190,11 @@ class ReadTask(
       case Type.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
       case Type.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
       case _ => throw new Exception("Unsupported data type: " + datatype)
-    } 
+    }
+
+    if (mismatch)
+      throw new Exception(s"Expecting: $datatype for Spark column: ${sf.name}")
+
     cv
   }
   

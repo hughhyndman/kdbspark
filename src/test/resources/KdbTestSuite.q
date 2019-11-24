@@ -30,8 +30,8 @@ test06:{[opt]
 	tbl:([] j:til 1000; p:2018.09.01D0+1D*til 1000; cc:1000#enlist "a string");
 
 	if[-1=opt`partitionid;
-	:0!meta tbl / Return the schema
-	];
+		:0!meta tbl / Return the schema
+		];
 
 	.sp.pruneAndFilter[opt;tbl]
 	}
@@ -138,14 +138,13 @@ test09:{[opt]
 	.sp.logDebug "test09";
 	.sp.logDebugOptions[opt];
 
-	if[-1=.sp.optGet[opt;`partitionid;-1]; 
-		nullsupport:.sp.optGetBoolean[opt;`nullsupport;1b];
-		:update n:nullsupport from 0!meta test09table; 
+	if[-1=.sp.optGet[opt;`partitionid;-1];
+		:update n:1b from 0!meta test09table;
 		]
 
 	test09table
 	}
 
-test10:test09
+
 
 
