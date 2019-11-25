@@ -2,6 +2,9 @@ import org.scalatest._
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import scala.collection.mutable
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.types._
+import java.sql.{Timestamp => JTimestamp, Date => JDate}
 
 class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
   var spark: SparkSession = _
@@ -37,7 +40,6 @@ class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
 
 class KdbTestRead extends KdbTestBase {
 
-
   test("KDBSPARK-01: Simple end-to-end test") {
     val df = spark.read.format("kdb").options(gopts)
       .schema("id long")
@@ -63,8 +65,6 @@ class KdbTestRead extends KdbTestBase {
   }
 
   test("KDBSPARK-04: Simple result with schema provided (StructType)") {
-    import org.apache.spark.sql.types._
-
     val s = StructType(List(
       StructField("j", LongType, false),
       StructField("p", TimestampType, false),
@@ -132,7 +132,6 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-11: Unsupported datatype") {
     val e = intercept[Exception] {
-      import org.apache.spark.sql.types._
       val s = StructType(List(StructField("jc", DecimalType(20,2), false)))
       val df = spark.read.format("kdb").options(gopts)
         .schema(s)
@@ -180,5 +179,86 @@ class KdbTestRead extends KdbTestBase {
   }
 
   //TODO: Complete tests for all datatype mismatches
+}
+
+class KdbTestWrite extends KdbTestBase {
+
+  test("KDBSPARK-50: Test numeric datatypes") {
+    val sc = spark.sparkContext
+
+    val row = Row.apply(
+      true,
+      123.toByte,
+      123.toShort,
+      123.toInt,
+      1234.toLong,
+      3.5.toFloat,
+      3.5.toDouble)
+
+    val schema =
+      StructType(
+        StructField("bc", BooleanType) ::
+        StructField("xc", ByteType) ::
+        StructField("hc", ShortType) ::
+        StructField("ic", IntegerType) ::
+        StructField("jc", LongType) ::
+        StructField("ec", FloatType) ::
+        StructField("fc", DoubleType) ::
+        Nil)
+
+    val df = spark.createDataFrame(sc.parallelize(Array[Row](row)), schema)
+
+    df.write.format("kdb").options(gopts)
+      .option("batchsize", 2)
+      .option("function", "test50")
+      .option("writeaction", "append")
+      .save
+  }
+
+  test("KDBSPARK-51: Test date and string datatypes") {
+    val sc = spark.sparkContext
+
+    val row = Row.apply(
+      new JTimestamp(1489997145000L),
+      new JDate(1489997145000L),
+      "a string"
+      )
+
+    val schema =
+      StructType(
+        StructField("pc", TimestampType) ::
+        StructField("dc", DateType) ::
+        StructField("cc", StringType) ::
+        Nil)
+
+    val df = spark.createDataFrame(sc.parallelize(Array[Row](row)), schema)
+
+    df.write.format("kdb").options(gopts)
+      .option("batchsize", 2)
+      .option("function", "test51")
+      .option("writeaction", "append")
+      .save
+  }
+
+  test("KDBSPARK-52: Array datatypes") {
+    val df = spark.read.format("kdb").options(gopts)
+      .option("table", "test08table")
+      .option("loglevel", "debug")
+      .load
+
+    df.select("xxc", "bbc", "hhc", "iic", "jjc", "eec", "ffc")
+      .write.format("kdb").options(gopts)
+      .option("batchsize", 20)
+      .option("function", "test52")
+      .option("writeaction", "append")
+      .option("loglevel", "debug")
+      .save
+  }
+
+}
+
+/* Class to test performance (and reliability) */
+class KdbTestPerformance extends KdbTestBase {
+
 }
 

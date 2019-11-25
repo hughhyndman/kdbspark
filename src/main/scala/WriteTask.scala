@@ -50,8 +50,10 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
       batchSize = options.getInt(Opt.BATCHSIZE, Opt.BATCHSIZEDEF)
       if (log.isDebugEnabled) {
         log.debug("write(): first call")
-        log.debug(s"  batchsize:     $batchSize")
         log.debug(s"  partitionId:   $partitionId")
+        log.debug(s"  taskId:        $taskId")
+        log.debug(s"  epochId        $epochId")
+        log.debug(s"  mode           $mode")
         //TODO: anything else to log?
       }
 
@@ -61,52 +63,46 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
       }
     }
 
+    val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day
+
     /*
      * Loop through the columns in the provided row, placing the data into the batch
      * column arrays
      */
     for (i <- 0 until schema.length) {
       val nn = !row.isNullAt(i); //! row(i) != null; // Not null
-      /*
-      val bi = batch(i);
-      val dt = schema(i).dataType;
-      val ob = row.get(i, dt);
-      val rt = row.get(i, TimestampType);
-      val oneday = 24 * 60 * 60 * 1000
-      log.debug(s"i=$i; bi=$bi; dt=$dt; rt=$rt; ob=$ob");
-
-
 
       batch(i) match {
-        case a:Array[Boolean] => a(batchind) = row.getBoolean(i)
-        case a:Array[Byte] => a(batchind) = row.getByte(i) //! row.getAs[Byte](i)
-        case a:Array[Short] => a(batchind) = if (nn) row.getShort(i) else Kdb.ShortNull
-        case a:Array[Int] => a(batchind) = if (nn) row.getInt(i) else Kdb.IntNull
-        case a:Array[Long] => a(batchind) = if (nn) row.getLong(i) else Kdb.LongNull
-        case a:Array[Float] => a(batchind) = if (nn) row.getFloat(i) else Kdb.FloatNull
-        case a:Array[Double] => a(batchind) = if (nn) row.getDouble(i) else Kdb.DoubleNull
-        case a:Array[JTimestamp] => a(batchind) = if (nn) new JTimestamp(row.getLong(i) / 1000) else Kdb.TimestampNull
-//! Somehow the TZ crept in below
-        case a:Array[JDate] => a(batchind) = if (nn) new JDate(row.getLong(i) * oneday) else Kdb.DateNull
+        case a:Array[Boolean] => a(indBatch) = row.getBoolean(i)
+        case a:Array[Byte] => a(indBatch) = row.getByte(i) //! row.getAs[Byte](i)
+        case a:Array[Short] => a(indBatch) = if (nn) row.getShort(i) else Type.ShortNull
+        case a:Array[Int] => a(indBatch) = if (nn) row.getInt(i) else Type.IntNull
+        case a:Array[Long] => a(indBatch) = if (nn) row.getLong(i) else Type.LongNull
+        case a:Array[Float] => a(indBatch) = if (nn) row.getFloat(i) else Type.FloatNull
+        case a:Array[Double] => a(indBatch) = if (nn) row.getDouble(i) else Type.DoubleNull
+        case a:Array[JTimestamp] => a(indBatch) = if (nn) new JTimestamp(row.getLong(i) / 1000) else Type.TimestampNull
+        case a:Array[JDate] => a(indBatch) = if (nn) new JDate(row.getLong(i) * oneday) else Type.DateNull //TODO: Somehow the TZ crept in
 
-        case a:Array[Object] => a(batchind) =
+        case a:Array[Object] => a(indBatch) =
           schema(i).dataType match {
-            case StringType => if (nn) row.getString(i).toCharArray.asInstanceOf[Object] else Kdb.StringNull
-            case Kdb.LongArrayType => row.getArray(i).asInstanceOf[WrappedArray[Array[Long]]].array
-            case Type.BooleanArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Boolean]]].array
-            case Type.ByteArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Byte]]].array
-            case Type.ShortArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Short]]].array
-            case Type.IntegerArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Int]]].array
-            case Type.LongArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Long]]].array
-            case Type.FloatArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Float]]].array
-            case Type.DoubleArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[Double]]].array
-            case Type.TimestampArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[JTimestamp]]].array
-            case Type.DateArrayType => row(i).asInstanceOf[mutable.WrappedArray[Array[JDate]]].array
+            case StringType => if (nn) row.getString(i).toCharArray.asInstanceOf[Object] else Type.StringNull
+            case Type.BooleanArrayType => row.getArray(i).toBooleanArray();
+            case Type.ByteArrayType => row.getArray(i).toByteArray();
+            case Type.ShortArrayType => row.getArray(i).toShortArray();
+            case Type.IntegerArrayType => row.getArray(i).toIntArray();
+            case Type.LongArrayType => row.getArray(i).toLongArray();
+            case Type.FloatArrayType => row.getArray(i).toFloatArray();
+            case Type.DoubleArrayType => row.getArray(i).toDoubleArray();
+
+              //TODO: Struggling with conversion here
+//           case Type.TimestampArrayType => row.getArray(i).toLongArray.asInstanceOf[Array[JTimestamp]]; //! asInstanceOf[mutable.WrappedArray[Array[JTimestamp]]].arra
+ //           case Type.DateArrayType => row.getArray(i).toArray[JDate](IntegerType); // ! .asInstanceOf[Array[JDate]]
+
             case _ => throw new Exception("Unsupported data type: " + schema(i).dataType)
           }
+
         case _ => throw new Exception("Unsupported data type: " + batch(i).getClass)
       }
-    */
     }
 
     /* If we filled a batch; send it to kdb+ */
@@ -119,6 +115,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
   }
 
   override def commit(): WriterCommitMessage = {
+    log.debug("WriteTask.commit()")
     if (batch != null) {
       truncateBatch(indBatch) // Resize batch to fit remaining rows
       writeBatch(Opt.COMMIT)
@@ -128,6 +125,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
   }
 
   override def abort(): Unit = {
+    log.debug("WriteTask.abort()")
     truncateBatch(0)
     writeBatch(Opt.ABORT)
     batch = null; // Free memory

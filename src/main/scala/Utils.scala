@@ -145,6 +145,7 @@ object KdbCall {
 
     con.s.setSoTimeout(timeout)
 
+    //TODO: Would be good to log any exception and then rethrow
     val res = con.k(req)
     con.close()
     res

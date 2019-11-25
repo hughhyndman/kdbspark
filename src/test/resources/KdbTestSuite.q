@@ -145,6 +145,35 @@ test09:{[opt]
 	test09table
 	}
 
+test50:{[opt;tbl]
+	.sp.setLogLevel .sp.optGet[opt;`loglevel;`warn];
+	.sp.logDebug "test50[]";
+	.sp.logDebugOptions[opt];
+
+	T::tbl;
+	0
+	}
+
+test51:{[opt;tbl]
+	.sp.setLogLevel .sp.optGet[opt;`loglevel;`warn];
+	.sp.logDebug "test51[]";
+	.sp.logDebugOptions[opt];
+
+	T::tbl;
+	0
+	}
+
+test52:{[opt;tbl]
+	.sp.setLogLevel .sp.optGet[opt;`loglevel;`warn];
+	.sp.logDebug "test52[]";
+	.sp.logDebugOptions[opt];
+
+	show tbl;
+	T::tbl;
+	0
+	}
+
+
 
 
 
