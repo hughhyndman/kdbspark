@@ -419,7 +419,8 @@ class ReadTask(
         cv.putNull(rowind)
     }
   }
-    
+
+
   private def putDateArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
     var numelem = 0
     

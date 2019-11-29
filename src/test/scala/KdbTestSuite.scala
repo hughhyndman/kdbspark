@@ -5,7 +5,6 @@ import scala.collection.mutable
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 import java.sql.{Timestamp => JTimestamp, Date => JDate}
-import java.util.Calendar
 
 class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
   var spark: SparkSession = _
@@ -14,6 +13,7 @@ class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
   var gopts = new mutable.HashMap[String, String]
   gopts.put("host", "localhost")
   gopts.put("port", "5000")
+  gopts.put("loglevel", "debug")
 
 
   override def beforeAll(cm: ConfigMap) :Unit = {
@@ -21,11 +21,8 @@ class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
       .setAppName("kdbspark")
       .setMaster("local")
       .set("spark.default.parallelism", "1")
-      .set("spark.sql.session.timeZone", "GMT")
-      .set("user.timezone", "GMT")
-     // .set("spark.jars", "/users/hhyndman/dev/spark-2.4.4/kdbspark.jar")
 
-    /* Place test configuration options in global optons for data source reader */
+    /* Place test configuration options in global options for data source reader */
     for ((k,v) <- cm) {
       gopts.put(k, v.toString)
     }
@@ -193,7 +190,6 @@ class KdbTestRead extends KdbTestBase {
 }
 
 class KdbTestWrite extends KdbTestBase {
-/*
   test("KDBSPARK-50: Test numeric datatypes") {
     val sc = spark.sparkContext
 
@@ -225,7 +221,7 @@ class KdbTestWrite extends KdbTestBase {
       .option("writeaction", "append")
       .save
   }
-*/
+
   test("KDBSPARK-51: Test date datatypes") {
     val sc = spark.sparkContext
 
@@ -248,7 +244,7 @@ class KdbTestWrite extends KdbTestBase {
       .option("writeaction", "append")
       .save
   }
-/*
+
   test("KDBSPARK-52: Array datatypes") {
     val df = spark.read.format("kdb").options(gopts)
       .option("table", "test08table")
@@ -264,21 +260,6 @@ class KdbTestWrite extends KdbTestBase {
 
   test("KDBSPARK-53: Date and Timestamp loopback") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test15")
-      .load
-    df.show(false)
-
-    df.write.format("kdb").options(gopts)
-      .option("function", "test53")
-      .save
-  }
-*/
-}
-
-/* Class to test performance (and reliability) */
-class KdbTestPerformance extends KdbTestBase {
-  test("KDBSPARK-53: Date and Timestamp loopback") {
-    val df = spark.read.format("kdb").options(gopts)
       .option("table", "test53table")
       .load
     df.show(false)
@@ -289,5 +270,9 @@ class KdbTestPerformance extends KdbTestBase {
 
     spark.read.format("kdb").options(gopts).option("table", "T53").load.show(false)
   }
+}
+
+/* Class to test performance (and reliability) */
+class KdbTestPerformance extends KdbTestBase {
 }
 

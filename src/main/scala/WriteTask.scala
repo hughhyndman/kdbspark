@@ -70,7 +70,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobId: String, sc
 
       batch(i) match {
         case a:Array[Boolean] => a(indBatch) = row.getBoolean(i)
-        case a:Array[Byte] => a(indBatch) = row.getByte(i) //! row.getAs[Byte](i)
+        case a:Array[Byte] => a(indBatch) = row.getByte(i)
         case a:Array[Short] => a(indBatch) = if (nn) row.getShort(i) else Type.ShortNull
         case a:Array[Int] => a(indBatch) = if (nn) row.getInt(i) else Type.IntNull
         case a:Array[Long] => a(indBatch) = if (nn) row.getLong(i) else Type.LongNull

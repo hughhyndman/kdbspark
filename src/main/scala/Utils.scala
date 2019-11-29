@@ -143,11 +143,19 @@ object KdbCall {
     }
 
     con.s.setSoTimeout(timeout)
-//    con.tz = java.util.TimeZone.getTimeZone("GMT")
 
-    //TODO: Would be good to log any exception and then rethrow
-    val res = con.k(req)
-    con.close()
+    var res: Object = null
+    try {
+      res = con.k(req)
+    }
+    catch {
+      case e: Exception => {
+        log.error(s"Kdb+ call failed with message: ${e.getMessage}")
+        con.close()
+        throw e
+      }
+    }
+
     res
   }
 
@@ -167,17 +175,13 @@ object KdbCall {
     val vals = new Array[Object](n)
     var i = 0
 
-    /* Append options */
+    /* Prepare relevant kdb+ options */
     for ((k, v) <- optionmap) {
-      /* convert all keys to lower case and dictionary values to a convenient kdb+ datatype */
-
-      //TODO: Remove unecessary options (e.g., userpass, host, port, etc.)
       keys(i) = k.toLowerCase
       vals(i) = keys(i) match {
-        case "loglevel" | "writeaction" => v
-        case "partitionid" | "numpartitions" | "batchsize" | "batchcount" =>
+        case Opt.LOGLEVEL | Opt.WRITEACTION | Opt.MODE => v /* Keep as kdb+ symbol */
+        case Opt.PARTITIONID | Opt.NUMPARTITIONS | Opt.BATCHSIZE | Opt.BATCHCOUNT =>
           v.toLong.asInstanceOf[Object]
-        case "useTLS" => v.toBoolean.asInstanceOf[Object]
         case _ => v.toCharArray.asInstanceOf[Object]
       }
       i += 1
