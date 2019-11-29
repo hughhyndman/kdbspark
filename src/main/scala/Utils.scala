@@ -87,7 +87,6 @@ object KdbCall {
   }
 
   def write(options: java.util.Map[String, String], schema: StructType, coldata: Array[Object]): Unit = {
-    //TODO: Doublecheck (understand) range of values for partionId coming from Spark
     val hostind = optGetInt(options, Opt.PARTITIONID, 0)
     val flip = new c.Flip(new c.Dict(schemaColumns(schema), coldata))
     val res = call(hostind, options, optionsToDict(options, Map[String, Object]()), flip)
@@ -144,6 +143,7 @@ object KdbCall {
     }
 
     con.s.setSoTimeout(timeout)
+//    con.tz = java.util.TimeZone.getTimeZone("GMT")
 
     //TODO: Would be good to log any exception and then rethrow
     val res = con.k(req)
@@ -170,6 +170,7 @@ object KdbCall {
     /* Append options */
     for ((k, v) <- optionmap) {
       /* convert all keys to lower case and dictionary values to a convenient kdb+ datatype */
+
       //TODO: Remove unecessary options (e.g., userpass, host, port, etc.)
       keys(i) = k.toLowerCase
       vals(i) = keys(i) match {

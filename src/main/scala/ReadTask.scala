@@ -20,6 +20,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
 import org.apache.spark.sql.vectorized.ColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
   
 import org.apache.log4j.Logger
 
@@ -336,9 +337,9 @@ class ReadTask(
   }
   
   private def putDates(numrows: Int, cd: Array[JDate], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
-    val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day    
+    val oneday: Long = 24 * 60 * 60 * 1000 // Milliseconds in a day
     for (rowind <- 0 until numrows) {
-      cv.putInt(rowind, (cd(rowind).getTime / oneday).asInstanceOf[Int])
+      cv.putInt(rowind, DateTimeUtils.fromJavaDate(cd(rowind)))
       if (nullable && cd(rowind).getTime == Type.LongNull)
         cv.putNull(rowind)
     }  
@@ -352,7 +353,7 @@ class ReadTask(
         cv.putNull(rowind)
       else {
         date.set(2000 + cd(rowind).i / 12, cd(rowind).i % 12, 1, 0, 0, 0)
-        cv.putInt(rowind, (date.getTime.getTime / oneday).asInstanceOf[Int])              
+        cv.putInt(rowind, (date.getTime.getTime / oneday).asInstanceOf[Int])
       }
     }    
   }
@@ -420,8 +421,6 @@ class ReadTask(
   }
     
   private def putDateArray(numrows: Int, cd: Array[Object], cv: OnHeapColumnVector, nullable: Boolean): Unit = {
-    val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day  
-    
     var numelem = 0
     
     for (rowind <- 0 until numrows) {
@@ -430,7 +429,7 @@ class ReadTask(
       
       val ad = cv.arrayData()      
       for (i <- 0 until len) 
-        ad.appendInt((d(i).getTime / oneday).asInstanceOf[Int])
+        ad.appendInt(DateTimeUtils.fromJavaDate(d(i)))
 
       cv.putArray(rowind, numelem, len) 
       numelem += len

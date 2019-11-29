@@ -5,6 +5,7 @@ import scala.collection.mutable
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 import java.sql.{Timestamp => JTimestamp, Date => JDate}
+import java.util.Calendar
 
 class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
   var spark: SparkSession = _
@@ -20,7 +21,9 @@ class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
       .setAppName("kdbspark")
       .setMaster("local")
       .set("spark.default.parallelism", "1")
-      .set("spark.jars", "/users/hhyndman/dev/spark-2.4.4/kdbspark.jar")
+      .set("spark.sql.session.timeZone", "GMT")
+      .set("user.timezone", "GMT")
+     // .set("spark.jars", "/users/hhyndman/dev/spark-2.4.4/kdbspark.jar")
 
     /* Place test configuration options in global optons for data source reader */
     for ((k,v) <- cm) {
@@ -178,11 +181,19 @@ class KdbTestRead extends KdbTestBase {
     assert(e.contains("Expecting"))
   }
 
+  test("KDBSPARK-15: Date and Timestamp retrieval") {
+    val df = spark.read.format("kdb").options(gopts)
+      .option("function", "test15")
+      .load
+
+      df.show(false)
+  }
+
   //TODO: Complete tests for all datatype mismatches
 }
 
 class KdbTestWrite extends KdbTestBase {
-
+/*
   test("KDBSPARK-50: Test numeric datatypes") {
     val sc = spark.sparkContext
 
@@ -214,24 +225,22 @@ class KdbTestWrite extends KdbTestBase {
       .option("writeaction", "append")
       .save
   }
-
-  test("KDBSPARK-51: Test date and string datatypes") {
+*/
+  test("KDBSPARK-51: Test date datatypes") {
     val sc = spark.sparkContext
 
-    val row = Row.apply(
-      new JTimestamp(1489997145000L),
-      new JDate(1489997145000L),
-      "a string"
+    val row = Row.apply(JTimestamp.valueOf("2020-01-01 00:00:00.0"),
+      JDate.valueOf("2020-01-01")
       )
 
     val schema =
       StructType(
         StructField("pc", TimestampType) ::
         StructField("dc", DateType) ::
-        StructField("cc", StringType) ::
         Nil)
 
     val df = spark.createDataFrame(sc.parallelize(Array[Row](row)), schema)
+    df.show(false)
 
     df.write.format("kdb").options(gopts)
       .option("batchsize", 2)
@@ -239,26 +248,46 @@ class KdbTestWrite extends KdbTestBase {
       .option("writeaction", "append")
       .save
   }
-
+/*
   test("KDBSPARK-52: Array datatypes") {
     val df = spark.read.format("kdb").options(gopts)
       .option("table", "test08table")
-      .option("loglevel", "debug")
       .load
 
-    df.select("xxc", "bbc", "hhc", "iic", "jjc", "eec", "ffc")
+    df.select("xxc", "bbc", "hhc", "iic", "jjc", "eec", "ffc", "ppc", "ddc")
       .write.format("kdb").options(gopts)
       .option("batchsize", 20)
       .option("function", "test52")
       .option("writeaction", "append")
-      .option("loglevel", "debug")
       .save
   }
 
+  test("KDBSPARK-53: Date and Timestamp loopback") {
+    val df = spark.read.format("kdb").options(gopts)
+      .option("function", "test15")
+      .load
+    df.show(false)
+
+    df.write.format("kdb").options(gopts)
+      .option("function", "test53")
+      .save
+  }
+*/
 }
 
 /* Class to test performance (and reliability) */
 class KdbTestPerformance extends KdbTestBase {
+  test("KDBSPARK-53: Date and Timestamp loopback") {
+    val df = spark.read.format("kdb").options(gopts)
+      .option("table", "test53table")
+      .load
+    df.show(false)
 
+    df.write.format("kdb").options(gopts)
+      .option("function", "test53")
+      .save
+
+    spark.read.format("kdb").options(gopts).option("table", "T53").load.show(false)
+  }
 }
 

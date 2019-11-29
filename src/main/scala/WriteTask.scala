@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-import java.sql.{Timestamp => JTimestamp, Date => JDate}
+import java.sql.{Timestamp => JTimestamp,Date => JDate}
 import java.util
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.sources.v2._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.Row
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.sources.v2.writer._
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.util.ArrayData
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.log4j.Logger
 
 import scala.collection.mutable
 
-//TODO: Must test with multiple Spark partitions (partitionId?)
-
-class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, schema: StructType, mode: SaveMode, optionmap: util.Map[String,String])
+class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobId: String, schema: StructType, mode: SaveMode, optionmap: util.Map[String,String])
     extends DataWriter[InternalRow] {
   @transient lazy val options = new DataSourceOptions(optionmap)
   @transient lazy val log: Logger = Logger.getLogger("kdb")
@@ -54,7 +52,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
         log.debug(s"  taskId:        $taskId")
         log.debug(s"  epochId        $epochId")
         log.debug(s"  mode           $mode")
-        //TODO: anything else to log?
+        log.debug(s"  jobId          $jobId")
       }
 
       batch = new Array[Object](schema.length)
@@ -63,14 +61,12 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
       }
     }
 
-    val oneday = 24 * 60 * 60 * 1000 // Milliseconds in a day
-
     /*
      * Loop through the columns in the provided row, placing the data into the batch
      * column arrays
      */
     for (i <- 0 until schema.length) {
-      val nn = !row.isNullAt(i); //! row(i) != null; // Not null
+      val nn = !row.isNullAt(i);
 
       batch(i) match {
         case a:Array[Boolean] => a(indBatch) = row.getBoolean(i)
@@ -81,10 +77,8 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
         case a:Array[Float] => a(indBatch) = if (nn) row.getFloat(i) else Type.FloatNull
         case a:Array[Double] => a(indBatch) = if (nn) row.getDouble(i) else Type.DoubleNull
         case a:Array[JTimestamp] => a(indBatch) = if (nn) new JTimestamp(row.getLong(i) / 1000) else Type.TimestampNull
-        case a:Array[JDate] => a(indBatch) = if (nn) new JDate(row.getLong(i) * oneday) else Type.DateNull //TODO: Somehow the TZ crept in
-
-        case a:Array[Object] => a(indBatch) =
-          schema(i).dataType match {
+        case a:Array[JDate] => a(indBatch) = if (nn) DateTimeUtils.toJavaDate(row.getInt(i)) else Type.DateNull
+        case a:Array[Object] => a(indBatch) = schema(i).dataType match {
             case StringType => if (nn) row.getString(i).toCharArray.asInstanceOf[Object] else Type.StringNull
             case Type.BooleanArrayType => row.getArray(i).toBooleanArray();
             case Type.ByteArrayType => row.getArray(i).toByteArray();
@@ -94,9 +88,8 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
             case Type.FloatArrayType => row.getArray(i).toFloatArray();
             case Type.DoubleArrayType => row.getArray(i).toDoubleArray();
 
-              //TODO: Struggling with conversion here
-//           case Type.TimestampArrayType => row.getArray(i).toLongArray.asInstanceOf[Array[JTimestamp]]; //! asInstanceOf[mutable.WrappedArray[Array[JTimestamp]]].arra
- //           case Type.DateArrayType => row.getArray(i).toArray[JDate](IntegerType); // ! .asInstanceOf[Array[JDate]]
+            case Type.TimestampArrayType => toTimestampArray(row.getArray(i))
+            case Type.DateArrayType => toDateArray(row.getArray(i))
 
             case _ => throw new Exception("Unsupported data type: " + schema(i).dataType)
           }
@@ -112,6 +105,28 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobid: String, sc
       batchCount += 1
       indBatch = 0
     }
+  }
+
+  def toTimestampArray(source: ArrayData): Array[JTimestamp] = {
+    val size = source.numElements()
+    val values = new Array[JTimestamp](size)
+    var i = 0
+    while (i < size) {
+      values(i) = new JTimestamp(source.getLong(i) / 1000)
+      i += 1
+    }
+    values
+  }
+
+  def toDateArray(source: ArrayData): Array[JDate] = {
+    val size = source.numElements()
+    val values = new Array[JDate](size)
+    var i = 0
+    while (i < size) {
+      values(i) = DateTimeUtils.toJavaDate(source.getInt(i))
+      i += 1
+    }
+    values
   }
 
   override def commit(): WriterCommitMessage = {

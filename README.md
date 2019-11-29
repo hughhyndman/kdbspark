@@ -4,13 +4,14 @@ For Spark 2.4.4 and upwards
 
 ## Task List
 
-- [ ] Move examples to test area (and rename tests)
-- [ ] Complete write support
-- [ ] Remove Kx platform support (include in comments and readme)
+- [ ] Timezone support for writing dates and timestamps
 - [ ] Complete README
 - [ ] Deal with TODOs and //!
 
 ## Datatype support
+
+https://code.kx.com/v2/ref/#datatypes
+https://spark.apache.org/docs/latest/sql-reference.html#data-types
 
 ### Simple Types
 
@@ -46,13 +47,10 @@ int[] | I | CreateArrayType(IntegerType, false) | array<int>
 long[] | J | CreateArrayType(LongType, false) | array<long>
 real[] | E | CreateArrayType(FloatType, false) | array<float>
 float[] | F | CreateArrayType(DoubleType, false) | array<double>
-timestamp[] | P | CreateArrayType(TimestampType, false) | array<tmestamp>
+timestamp[] | P | CreateArrayType(TimestampType, false) | array<timestamp>
 date[] | D | CreateArrayType(DateType, false) | array<date>
 
 Note that kdb+ uses the names `real` and `float` for 4-byte and 8-byte floating point respectively, which is contrary to how Spark names tham.
-
-
-
 
 ## Simple example
 
@@ -99,7 +97,33 @@ qexpr | A q expression that returns a unkeyed table | Schema must be provided
 table | A kdb+ table name | kdbds prepends an unkey ("0!") to name
 function | A kdb+ function that supports the kdbds call interface | See section
 pushfilters | Whether kdb+ function supports push-down filters | true
+batchsize | Number for rows to be written per round trip | 10000
 
-## Kdb+ Function Interface
+## Kdb+ Read Function
 
 Describe here...
+
+## Null Values
+
+General discussion of kdb+ nulls
+Include a table of constants used by kdb+. 
+Discuss ways of enabling null support
+
+## Kdb+ Write Function
+
+## Platform support
+
+Discuss opportunity to hook in calls via some sort of proxy (often called a query 
+router or dispatcher in kdb+)
+
+## Logging
+
+loglevel
+logging in the datasource
+logging in the kdb+ code (use spark.q script and .sp namespace)
+assertion in kdb+ (using Signal (') operator )
+log4j entries
+
+## Building and Testing
+
+

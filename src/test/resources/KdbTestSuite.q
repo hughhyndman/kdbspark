@@ -89,7 +89,7 @@ test08table:([]
 		eec:10#(1#.1e;100 200e;"e"$.1*til 10);
 		ffc:10#(1#.1f;100 200f;"f"$.1*til 10);
 		ccc:(10?26)#\:"abcdefghijklmnopqrstuvwxyz"; 
-		ppc:10#(1#.z.p;2#.z.p;3#.z.p);
+		ppc:10#("p"$1000000000*til 3;2#.z.p;3#.z.p);
 		ddc:10#(1#.z.d;2#.z.d;3#.z.d)
 		);
 
@@ -145,6 +145,26 @@ test09:{[opt]
 	test09table
 	}
 
+test15table:([]
+		pc:2000.01.01D0 2000.01.01D12 2020.01.01D5 2020.01.02D17, .z.p;
+		dc:2000.01.01 2000.01.01 2020.01.01 2020.01.02, .z.d
+		)
+
+test15:{[opt]
+	.sp.setLogLevel .sp.optGet[opt;`loglevel;`warn];
+
+	.sp.logDebug "test15";
+	.sp.logDebugOptions[opt];
+
+	if[-1=.sp.optGet[opt;`partitionid;-1];
+		:0!meta test15table;
+		]
+
+	test15table
+	}
+
+
+
 test50:{[opt;tbl]
 	.sp.setLogLevel .sp.optGet[opt;`loglevel;`warn];
 	.sp.logDebug "test50[]";
@@ -159,7 +179,7 @@ test51:{[opt;tbl]
 	.sp.logDebug "test51[]";
 	.sp.logDebugOptions[opt];
 
-	T::tbl;
+	T51::tbl;
 	0
 	}
 
@@ -169,7 +189,18 @@ test52:{[opt;tbl]
 	.sp.logDebugOptions[opt];
 
 	show tbl;
-	T::tbl;
+	T52::tbl;
+	0
+	}
+
+test53table:([] ppd:1#enlist 2000.01.01 2000.01.02 2020.01.01, .z.d)
+
+test53:{[opt;tbl]
+	.sp.setLogLevel .sp.optGet[opt;`loglevel;`warn];
+	.sp.logDebug "test52[]";
+	.sp.logDebugOptions[opt];
+
+	T53::tbl;
 	0
 	}
 

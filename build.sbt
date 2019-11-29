@@ -1,6 +1,6 @@
 name := "kdbspark"
 
-version := "0.1"
+version := "2.4.4"
 
 scalaVersion := "2.11.8"
 
