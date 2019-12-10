@@ -15,7 +15,6 @@ class KdbTestBase extends FunSuite with BeforeAndAfterAllConfigMap {
   gopts.put("port", "5000")
   gopts.put("loglevel", "debug")
 
-
   override def beforeAll(cm: ConfigMap) :Unit = {
     val conf = new SparkConf()
       .setAppName("kdbspark")
@@ -42,8 +41,8 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-01: Simple end-to-end test") {
     val df = spark.read.format("kdb").options(gopts)
-      .schema("id long")
-      .option("qexpr", "([] id:til 10)")
+      .schema("cj long")
+      .option("qexpr", "([] cj:til 10)")
       .load
     df.show(3, false)
   }
@@ -57,7 +56,7 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-03: Simple result with schema provided") {
     val df = spark.read.format("kdb").options(gopts)
-      .schema("j long, p timestamp, cc string") // Defaults to nullable
+      .schema("cj long, cp timestamp, ccc string") // Defaults to nullable
       .option("function", "test03")
       .option("pushFilters", false) // Function does not support push-down filters
       .load
@@ -66,9 +65,9 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-04: Simple result with schema provided (StructType)") {
     val s = StructType(List(
-      StructField("j", LongType, false),
-      StructField("p", TimestampType, false),
-      StructField("cc", StringType, false)
+      StructField("cj", LongType, false),
+      StructField("cp", TimestampType, false),
+      StructField("ccc", StringType, false)
     ))
 
     val df = spark.read.format("kdb").options(gopts)
@@ -94,7 +93,7 @@ class KdbTestRead extends KdbTestBase {
       .option("pushFilters", true)
       .load
 
-    df.filter("j>100 and p<=to_timestamp('2020-01-02')").select("p", "j").show(5, false)
+    df.filter("cj>100 and cp<=to_timestamp('2020-01-02')").select("cp", "cj").show(5, false)
   }
 
   test("KDBSPARK-07: Atomic data types") {
@@ -132,10 +131,10 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-11: Unsupported datatype") {
     val e = intercept[Exception] {
-      val s = StructType(List(StructField("jc", DecimalType(20,2), false)))
+      val s = StructType(List(StructField("cj", DecimalType(20,2), false)))
       val df = spark.read.format("kdb").options(gopts)
         .schema(s)
-        .option("qexpr", "([] jc:til 10)")
+        .option("qexpr", "([] cj:til 10)")
         .load
       df.show(false)
     }.getMessage
@@ -145,8 +144,8 @@ class KdbTestRead extends KdbTestBase {
   test("KDBSPARK-12: Column name mismatch") {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
-        .schema("i long")
-        .option("qexpr", "([] j:1 2)")
+        .schema("ci long")
+        .option("qexpr", "([] cj:1 2)")
         .load
 
       df.show(false)
@@ -157,8 +156,8 @@ class KdbTestRead extends KdbTestBase {
   test("KDBSPARK-13: Integer datatype mismatch") {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
-        .schema("j int")
-        .option("qexpr", "([] j:1 2)")
+        .schema("cj int")
+        .option("qexpr", "([] cj:1 2)")
         .load
 
       df.show(false)
@@ -169,8 +168,8 @@ class KdbTestRead extends KdbTestBase {
   test("KDBSPARK-14: Long datatype mismatch") {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
-        .schema("j long")
-        .option("qexpr", "([] j:1 2i)")
+        .schema("cj long")
+        .option("qexpr", "([] cj:1 2i)")
         .load
 
       df.show(false)
@@ -186,7 +185,19 @@ class KdbTestRead extends KdbTestBase {
       df.show(false)
   }
 
-  //TODO: Complete tests for all datatype mismatches
+  test("KDBSPARK-16: Short datatype mismatch") {
+    val e = intercept[Exception] {
+      val df = spark.read.format("kdb").options(gopts)
+        .schema("cj short")
+        .option("qexpr", "([] cj:1 2i)")
+        .load
+
+      df.show(false)
+    }.getMessage
+    assert(e.contains("Expecting"))
+  }
+
+//TODO: Data type mismatches here
 }
 
 class KdbTestWrite extends KdbTestBase {
@@ -204,15 +215,14 @@ class KdbTestWrite extends KdbTestBase {
 
     val schema =
       StructType(
-        StructField("bc", BooleanType) ::
-        StructField("xc", ByteType) ::
-        StructField("hc", ShortType) ::
-        StructField("ic", IntegerType) ::
-        StructField("jc", LongType) ::
-        StructField("ec", FloatType) ::
-        StructField("fc", DoubleType) ::
+        StructField("cb", BooleanType) ::
+        StructField("cx", ByteType) ::
+        StructField("ch", ShortType) ::
+        StructField("ci", IntegerType) ::
+        StructField("cj", LongType) ::
+        StructField("ce", FloatType) ::
+        StructField("cf", DoubleType) ::
         Nil)
-
     val df = spark.createDataFrame(sc.parallelize(Array[Row](row)), schema)
 
     df.write.format("kdb").options(gopts)
@@ -231,8 +241,8 @@ class KdbTestWrite extends KdbTestBase {
 
     val schema =
       StructType(
-        StructField("pc", TimestampType) ::
-        StructField("dc", DateType) ::
+        StructField("cp", TimestampType) ::
+        StructField("cd", DateType) ::
         Nil)
 
     val df = spark.createDataFrame(sc.parallelize(Array[Row](row)), schema)
@@ -250,9 +260,9 @@ class KdbTestWrite extends KdbTestBase {
       .option("table", "test08table")
       .load
 
-    df.select("xxc", "bbc", "hhc", "iic", "jjc", "eec", "ffc", "ppc", "ddc")
+    df.select("cxx", "cbb", "chh", "cii", "cjj", "cee", "cff", "cpp", "cdd")
       .write.format("kdb").options(gopts)
-      .option("batchsize", 20)
+      .option("batchsize", 1)
       .option("function", "test52")
       .option("writeaction", "append")
       .save
@@ -272,7 +282,4 @@ class KdbTestWrite extends KdbTestBase {
   }
 }
 
-/* Class to test performance (and reliability) */
-class KdbTestPerformance extends KdbTestBase {
-}
 

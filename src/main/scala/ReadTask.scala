@@ -182,14 +182,16 @@ class ReadTask(
 
       /* Array Types */
       case Type.BooleanArrayType => putBooleanArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // B
-      case Type.ByteArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // X
-      case Type.ShortArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // H
-      case Type.IntegerArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // I
-      case Type.LongArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // J
-      case Type.FloatArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // E
-      case Type.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
       case Type.TimestampArrayType => putTimestampArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // P
       case Type.DateArrayType => putDateArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // D
+
+      case Type.ByteArrayType | // X
+        Type.ShortArrayType | // H
+        Type.IntegerArrayType | // I
+        Type.LongArrayType | // J
+        Type.FloatArrayType | // E
+        Type.DoubleArrayType => putArray(numrows, cd.asInstanceOf[Array[Object]], cv, nullable) // F
+
       case _ => throw new Exception("Unsupported data type: " + datatype)
     }
 

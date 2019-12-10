@@ -81,7 +81,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
   
   override def pruneColumns(requiredSchema: StructType): Unit = {
     if (log.isDebugEnabled) {
-      log.debug("pruneColums()")
+      log.debug("pruneColumns()")
       requiredSchema.foreach(s => log.debug("  " + s.toString))
     }
     
@@ -176,7 +176,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     val nullables = if (ind >= 0) 
       flip.y(ind).asInstanceOf[Array[Boolean]]
     else
-      new Array[Boolean](cols.length) // Default is false
+      new Array[Boolean](cols.length) // Default is false (all not null)
     
     /* Create schema from meta received from kdb+ */
     val fields = new Array[StructField](cols.length)

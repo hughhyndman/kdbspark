@@ -62,6 +62,15 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobId: String, sc
     }
 
     /*
+     * If this batch is full, send it to kdb+
+     */
+    if (indBatch == batchSize) {
+      writeBatch(Opt.WRITE)
+      batchCount += 1
+      indBatch = 0
+    }
+
+    /*
      * Loop through the columns in the provided row, placing the data into the batch
      * column arrays
      */
@@ -87,7 +96,6 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobId: String, sc
             case Type.LongArrayType => row.getArray(i).toLongArray();
             case Type.FloatArrayType => row.getArray(i).toFloatArray();
             case Type.DoubleArrayType => row.getArray(i).toDoubleArray();
-
             case Type.TimestampArrayType => toTimestampArray(row.getArray(i))
             case Type.DateArrayType => toDateArray(row.getArray(i))
 
@@ -98,13 +106,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobId: String, sc
       }
     }
 
-    /* If we filled a batch; send it to kdb+ */
     indBatch += 1
-    if (indBatch == batchSize) {
-      writeBatch(Opt.WRITE)
-      batchCount += 1
-      indBatch = 0
-    }
   }
 
   def toTimestampArray(source: ArrayData): Array[JTimestamp] = {
@@ -132,7 +134,7 @@ class WriteTask(partitionId: Int, taskId: Long, epochId: Long, jobId: String, sc
   override def commit(): WriterCommitMessage = {
     log.debug("WriteTask.commit()")
     if (batch != null) {
-      truncateBatch(indBatch) // Resize batch to fit remaining rows
+      truncateBatch(indBatch) // Resize batch (smaller) to fit remaining rows
       writeBatch(Opt.COMMIT)
       batch = null; // Free memory
     }

@@ -117,6 +117,7 @@ object KdbCall {
 
     val timeout = optGet(options, Opt.TIMEOUT, Opt.TIMEOUTDEF).toInt
 
+
     /* Build a request object to accommodate 1-3 arguments to k() */
     val req = if (qexpr.length > 0)
       qexpr.toCharArray
@@ -171,20 +172,23 @@ object KdbCall {
   /* Convert options and additional objects to a kdb+ dictionary */
   private def optionsToDict(optionmap: java.util.Map[String, String], objmap: Map[String, Object]): c.Dict = {
     val n = optionmap.size + (if (objmap != null) objmap.size else 0)
-    val keys = new Array[String](n)
-    val vals = new Array[Object](n)
+    var keys = new Array[String](n)
+    var vals = new Array[Object](n)
     var i = 0
 
-    /* Prepare relevant kdb+ options */
+    /* Convert option data types; skip others */
     for ((k, v) <- optionmap) {
+      var inc = 1
       keys(i) = k.toLowerCase
-      vals(i) = keys(i) match {
-        case Opt.LOGLEVEL | Opt.WRITEACTION | Opt.MODE => v /* Keep as kdb+ symbol */
+      keys(i) match {
+        case Opt.USERPASS | Opt.HOST | Opt.PORT | Opt.USETLS | "paths" => inc = 0 // Exclude these options
+        case Opt.LOGLEVEL | Opt.WRITEACTION | Opt.MODE => vals(i) = v // Will be a kdb+ symbol
         case Opt.PARTITIONID | Opt.NUMPARTITIONS | Opt.BATCHSIZE | Opt.BATCHCOUNT =>
-          v.toLong.asInstanceOf[Object]
-        case _ => v.toCharArray.asInstanceOf[Object]
+          vals(i) = v.toLong.asInstanceOf[Object] // Convert to a kdb+ long
+        case _ => vals(i) = v.toCharArray.asInstanceOf[Object] // Convert to String
       }
-      i += 1
+
+      i = i + inc;
     }
 
     /* Append additional objects */
@@ -194,7 +198,11 @@ object KdbCall {
       i += 1
     }
 
-    new c.Dict(keys, vals) // Return kdb+ dictionary
+    /* Trim the two arrays as we don't provide all options to kdb+ */
+    keys = keys.take(i)
+    vals = vals.take(i)
+
+    new c.Dict(keys, vals) // Combine and return as a kdb+ dictionary
   }
 
   /* Given a schema, return a list of column name strings */
@@ -279,7 +287,7 @@ object Type {
 object Opt {
   val HOST = "host"; val HOSTDEF = "localhost"  // U: host name or list of host names (separated by ;)
   val PORT = "port"; val PORTDEF = "5000" // U: port number or list of port numbers (separated by ;)
-  val TIMEOUT = "timeout"; val TIMEOUTDEF = "60" // U: timeout in seconds
+  val TIMEOUT = "timeout"; val TIMEOUTDEF = "60000" // U: timeout in milliseconds
   val USERPASS = "userpass"; val USERPASSDEF = "" // U: user ID and password
   val USETLS = "useTLS"; val USETLSDEF = false // U: whether to use TLS
 
@@ -293,9 +301,9 @@ object Opt {
   val QEXPR = "qexpr" // U: q expression that returns an unkeyed table
   val FUNCTION = "function" // U: A kdb+ function that processes based on options provided
 
-  val PUSHFILTERS = "pushFilters"; val PUSHFILTERSDEF = true // U: Whether kdb+ function support filters
-  val FILTERS = "filters" // G: List of filters that Spark wants kdb+ function to use
-  val COLUMNS = "columns" // G: List of columns to return from kdb+ function
+  val PUSHFILTERS = "pushFilters"; val PUSHFILTERSDEF = true // U: Whether the kdb+ function support filters
+  val FILTERS = "filters" // G: List of filters that Spark wants the kdb+ function to use
+  val COLUMNS = "columns" // G: List of columns to return from the kdb+ function
   val EXECUTOR = "executor" // G: Informational indicating host information about executor running read task
 
   val JOBID = "jobID" // S: Job ID of write process
