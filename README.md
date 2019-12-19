@@ -306,4 +306,4 @@ TBD
 
 TBD
 
-Show ETL to and from kdb+, BigQuery, Postgres, and a Spark streaming example
+Show ETL to and from kdb+, Parquet, BigQuery, Postgres, and a Spark streaming example
