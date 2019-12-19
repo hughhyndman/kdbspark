@@ -2,7 +2,7 @@
 
 The KdbSpark data source provides a high-performance read and write interface between Apache Spark (2.4) and Kx Systems' kdb+ database. The following sample illustrates a sample Spark shell session that fetches some specific columns from a kdb+ table.
 
-```scala
+```
 spark-2.4.4$ ./bin/spark-shell --master local[4] --jars kdbspark.jar
 Welcome to
       ____              __
@@ -16,16 +16,24 @@ Using Scala version 2.11.12 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_91)
 scala> val df = spark.read.format("kdb").
    | option("expr", "select ci,cp,cf from sampleTable").
    | load
-scala> df.show(3)
-+---+--------------------+-----------------+
-| ci|                  cp|               cf|
-+---+--------------------+-----------------+
-| 75|2020-01-19 12:06:...| 921.537384390831|
-|282|2020-01-02 03:45:...|829.9179940950125|
-|536|2020-01-18 13:30:...|472.9025000706315|
-+---+--------------------+-----------------+
+scala> df.show(3, false)
++---+-----------------------+-----------------+
+|ci |cp                     |cf               |
++---+-----------------------+-----------------+
+|75 |2020-01-19 12:06:54.468|921.537384390831 |
+|282|2020-01-02 03:45:55.59 |829.9179940950125|
+|536|2020-01-18 13:30:49.836|472.9025000706315|
++---+-----------------------+-----------------+
 only showing top 3 rows
 ```
+
+## Outstanding Work List
+- [] Complete README 
+- [] Renumber tests 
+- [] Sample code for write support
+- [] Document Spark streaming to kdb+
+- [] Test with Yarn, Mesos, and Kubernetes
+- [] Include executor IP in options passed to func if Log.DEBUG
 
 ## Reading Data From kdb+
 
@@ -53,7 +61,7 @@ q)mytbl:([]
   val:3.1415 2.7182 6.02210)
 
 scala> spark.read.format("kdb").
-   | option("expr","select from mytbl where not null(id)").
+   | option("expr", "select from mytbl where not null(id)").
    | load.show(false)
 
 +----+-----------------------+------+
@@ -69,7 +77,7 @@ KdbSpark makes two calls to kdb+. The first call gets the table's schema (by pre
 ```scala
 scala> spark.read.format("kdb").
    | schema("id long, ts timestamp, val double").
-   | option("expr","mytbl").
+   | option("expr", "mytbl").
    | load.show(false)
 
 +----+-----------------------+------+
@@ -127,15 +135,13 @@ sampleQuery:{[parms]
   }
 ```
 
-Spark can partition its processing to be spread across multiple nodes in a cluster. When Spark calls KdbSpark, it can provide the number of partitions (default is 1) from which the query will be performed. Each partition is given an integer ID starting at zero. 
+Spark can partition its processing to be spread across multiple nodes in a cluster. When Spark calls KdbSpark, it can provide the number of partitions (default is 1) from which the query will be performed. Each partition is given an integer ID starting at zero. When KdbSpark has to request kdb+ for the query schema, it directs the request to a single partition, and provides a partition ID of -1 in parameters provided to the the query function.
 
-When KdbSpark has to request kdb+ for the query schema, it directs the request to a single partition, and provides a partition ID of -1 in parameters provided to the the query function.
-
-A kdb+ script file is included in the project resources folder to use a guide. XXX
+Kdb+ script files are included in the project resources folder to use as a guide. One file, [spark.q](https://github.com/hughhyndman/kdbspark/blob/master/src/test/resources/spark.q), provides helper functions to help implement logging, pushdown filters, etc. The other, [sample.q](https://github.com/hughhyndman/kdbspark/blob/master/src/test/resources/sample.q), is a fully-commented working query.
 
 ### Pushdown Filters
 
-KdbSpark supports pushdown filters, which are essentially a set of predicates and conjunctions that comprise some or all of the where-clause in Spark SQL or the argument to a DataFrame's filter function. The filters are converted into kdb+ nested array format and are included in the function's parameter, whose responsibility is to convert the array to a kdb+ where clause or to the constraint parameter in kdb+'s functional select.
+KdbSpark supports pushdown filters, which are essentially a set of predicates and conjunctions that comprise some or all of the where-clause in Spark SQL (or the argument to a DataFrame's filter function). The filters are converted into kdb+ nested array format and are included in the function's parameter, whose responsibility is to convert the array to a kdb+ where clause or to the constraint parameter in kdb+'s functional select.
 
 For example, if a user enters the following filter expression:
 
@@ -149,7 +155,7 @@ Spark converts this to an Array[Filter], and sends it to Kdbspark, which in turn
 ((`le;`cp;2020.01.02D00:00:00.000000000);(`gt;`cj;100))
 ```
 
-It is up to the kdb+ developer to convert this expression for execution. A parsing utility (.sp.pruneAndFilter) in spark.q which the kdb+ developer may find useful as it applies the filter to mapped table. This array can be nested with and/or conjunctions and unary not.
+It is up to the kdb+ developer to convert this expression for execution. You may find the parsing utility (.sp.pruneAndFilter) in [spark.q](https://github.com/hughhyndman/kdbspark/blob/master/src/test/resources/spark.q) useful as it applies the filter to a mapped table.
 
 The following table provides a summary of the filters used by Spark, their arguments, and how Kdbspark converts each filter to a kdb+ array.
 
@@ -183,9 +189,16 @@ Spark users can specify a subset of columns that they want to process, as in the
 spark> df.select("col1", "col2")...show
 ```
 
+KdbSpark will provide a 
+
+KdbSpark includes a `columns` entry in the parameters with a list of column names to include in the result.
+
 ## Datatype Support
 
+TBD
+
 https://code.kx.com/v2/ref/#datatypes
+
 https://spark.apache.org/docs/latest/sql-reference.html#data-types
 
 ### Simple Types
@@ -245,28 +258,52 @@ func | A kdb+ function that supports the KdbSpark call interface |
 pushfilters | Whether kdb+ function supports push-down filters | true
 batchsize | Number for rows to be written per round trip | 10000
 
-
-## Null Values
-
-General discussion of kdb+ nulls
-Include a table of constants used by kdb+. 
-Discuss ways of enabling null support
-
 ## Kdb+ Write Function
 
 TBD
 
+## Reading in Parallel
+
+TBD: Discuss:
+
+* options("numpartitions", ...)
+* semicolon-separated list of hosts options("host", "a;b;c")
+* ditto for ports
+* each kdb+ `func` execution receives a different partitionid
+* using that partitionid to index other options that might contain various parameters
+
+```
+scala> val df = spark.read.format("kdb").
+   | option("numpartitions", 3).
+   | option("func", "multi").
+   | option("host", "host1;host2;host3").
+   | option("port", "5000;5000;5001").
+   | option("multiparm", "parm1;parm2;parm3").
+   | load
+```
+
 ## Platform support
 
+TBD 
+
 Discuss opportunity to hook in calls via some sort of proxy (often called a query 
-router or dispatcher in kdb+)
+router or dispatcher in kdb+). Include Brendan's snippet for Kx.
 
 ## Logging
 
-loglevel
-logging in the datasource
-logging in the kdb+ code (use spark.q script and .sp namespace)
-assertion in kdb+ (using Signal (') operator )
-log4j entries
+TBD:
+* loglevel
+* logging in the datasource
+* logging in the kdb+ code (use spark.q script and .sp namespace)
+* assertion in kdb+ (using Signal (') operator )
+* log4j entries
 
 ## Performance Considerations
+
+TBD
+
+## ETL Samples
+
+TBD
+
+Show ETL to and from kdb+, BigQuery, Postgres, and a Spark streaming example
