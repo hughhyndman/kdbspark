@@ -1,4 +1,4 @@
-# kdbspark: Spark Data Source (V2) for kdb+ Database
+# KdbSpark: Spark Data Source (V2) for kdb+ Database
 
 The KdbSpark data source provides a high-performance read and write interface between Apache Spark (2.4) and Kx Systems' kdb+ database. The following sample illustrates a sample Spark shell session that fetches some specific columns from a kdb+ table.
 
