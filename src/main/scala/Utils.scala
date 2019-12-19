@@ -52,27 +52,22 @@ object Util {
 object KdbCall {
   @transient lazy val log: Logger = Logger.getLogger("kdb")
 
-  /* If the table option is specified, convert it to a q expression */
-  def adjustForTable(options: java.util.Map[String, String], prefix: String): Unit = {
-    val tablename = optGet(options, Opt.TABLE, "")
-    if (tablename.length > 0)
-      options(Opt.QEXPR) = prefix + tablename
-  }
-
   /* Request for the kdb+ schema information required to map the query result to Spark */
   def schema(options: java.util.Map[String, String]): Object = {
-    adjustForTable(options, "0!meta ")
+    /* If a q expression is provided, prepend it with a meta call */
+    val expr = optGet(options, Opt.EXPR, "")
+    if (expr.length > 0)
+      options(Opt.EXPR) = "0!meta " + expr
+
     val hostind = 0 // Use the first host to get the schema
-    val res = call(hostind, options, optionsToDict(options, Map[String, Object]()), null)
+    val res = call(hostind, options, null)
     if (!res.isInstanceOf[c.Flip])
-      throw new Exception("Read call must return an unkeyed table with meta information")
+      throw new Exception("Schema call must return an unkeyed table with meta information")
     res
   }
 
   /* Make the kdb+ query */
   def query(options: java.util.Map[String, String], filters: Array[Object], schema: StructType): Object = {
-    adjustForTable(options, "0!")
-
     /* Additional options to provide to kdb+ */
     val objmap = Map[String, Object](
       Opt.FILTERS -> filters,
@@ -80,7 +75,7 @@ object KdbCall {
     )
 
     val hostind = optGetInt(options, Opt.PARTITIONID, 0)
-    val res = call(hostind, options, optionsToDict(options, objmap), null)
+    val res = call(hostind, options, null)
     if (!res.isInstanceOf[c.Flip])
       throw new Exception("Read call must return an unkeyed table with query results")
     res
@@ -89,10 +84,10 @@ object KdbCall {
   def write(options: java.util.Map[String, String], schema: StructType, coldata: Array[Object]): Unit = {
     val hostind = optGetInt(options, Opt.PARTITIONID, 0)
     val flip = new c.Flip(new c.Dict(schemaColumns(schema), coldata))
-    val res = call(hostind, options, optionsToDict(options, Map[String, Object]()), flip)
+    val res = call(hostind, options, flip)
   }
 
-  def call(hostind: Int, options: java.util.Map[String, String], arg1: Object, arg2: Object): Object = {
+  def call(hostind: Int, options: java.util.Map[String, String], writerows: Object): Object = {
     /*
      * If a list of kdb+ host names is provided, use the hostind as the
      * index. A list of ports, parallel to the hosts may be provided.
@@ -107,25 +102,25 @@ object KdbCall {
     val userpass = optGet(options, Opt.USERPASS, Opt.USERPASSDEF)
     val useTLS = optGetBoolean(options, Opt.USETLS, Opt.USETLSDEF)
 
-    /*
-     * These two options are mutually exclusive Either a function is called (that can return
-     * the schema and results, or a q expression is provided (where a schema has to be provided
-     * by the Spark caller).
-     */
-    val qexpr = optGet(options, Opt.QEXPR, "")
-    val fexpr = optGet(options, Opt.FUNCTION, "")
+    /* These two options (read methods) are mutually exclusive */
+    val expr = optGet(options, Opt.EXPR, "")
+    val func = optGet(options, Opt.FUNC, "")
 
     val timeout = optGet(options, Opt.TIMEOUT, Opt.TIMEOUTDEF).toInt
 
+    /* if we are calling a cooperating q function, bundle the options into a dictionary */
+    val optionsdict = if (func.length > 0)
+      optionsToDict(options, Map[String, Object]())
+    else
+      null
 
     /* Build a request object to accommodate 1-3 arguments to k() */
-    val req = if (qexpr.length > 0)
-      qexpr.toCharArray
-    else if (arg2 == null)
-      Array(fexpr.toCharArray, arg1)
+    val req = if (expr.length > 0)
+      expr.toCharArray
+    else if (writerows == null)
+      Array(func.toCharArray, optionsdict) // For read
     else
-      Array(fexpr.toCharArray, arg1, arg2)
-
+      Array(func.toCharArray, optionsdict, writerows) // For write
 
     /* Connect to kdb+ process. Log any exceptions to help the user diagnose issues */
     var con: c = null
@@ -297,9 +292,8 @@ object Opt {
   /*
    * The caller can choose ONE of these options to get data from kdb+
    */
-  val TABLE = "table" // U: A table name
-  val QEXPR = "qexpr" // U: q expression that returns an unkeyed table
-  val FUNCTION = "function" // U: A kdb+ function that processes based on options provided
+  val EXPR = "expr" // U: q expression that returns an unkeyed table
+  val FUNC = "func" // U: A kdb+ function that processes based on options provided
 
   val PUSHFILTERS = "pushFilters"; val PUSHFILTERSDEF = true // U: Whether the kdb+ function support filters
   val FILTERS = "filters" // G: List of filters that Spark wants the kdb+ function to use

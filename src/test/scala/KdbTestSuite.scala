@@ -42,14 +42,14 @@ class KdbTestRead extends KdbTestBase {
   test("KDBSPARK-01: Simple end-to-end test") {
     val df = spark.read.format("kdb").options(gopts)
       .schema("cj long")
-      .option("qexpr", "([] cj:til 10)")
+      .option("expr", "([] cj:til 10)")
       .load
     df.show(3, false)
   }
 
   test("KDBSPARK-02: Reading a complete table") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("table", "test02table")
+      .option("expr", "test02table")
       .load
     df.show(3, false)
   }
@@ -57,7 +57,7 @@ class KdbTestRead extends KdbTestBase {
   test("KDBSPARK-03: Simple result with schema provided") {
     val df = spark.read.format("kdb").options(gopts)
       .schema("cj long, cp timestamp, ccc string") // Defaults to nullable
-      .option("function", "test03")
+      .option("func", "test03")
       .option("pushFilters", false) // Function does not support push-down filters
       .load
     df.show(5, false)
@@ -72,7 +72,7 @@ class KdbTestRead extends KdbTestBase {
 
     val df = spark.read.format("kdb").options(gopts)
       .schema(s) // Better control of nullability
-      .option("function", "test04")
+      .option("func", "test04")
       .option("pushFilters", false)
       .load
 
@@ -81,7 +81,7 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-05: Schema inquiry") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test05")
+      .option("func", "test05")
       .load
 
     df.show(5, false)
@@ -89,7 +89,7 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-06: Column pruning and pushdown filters") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test06")
+      .option("func", "test06")
       .option("pushFilters", true)
       .load
 
@@ -98,7 +98,7 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-07: Atomic data types") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test07")
+      .option("func", "test07")
       .load
 
     df.show(5, false)
@@ -106,7 +106,7 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-08: Array data types") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test08")
+      .option("func", "test08")
       .load
 
       df.show(5, false)
@@ -114,19 +114,10 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-09: Null support") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test09")
+      .option("func", "test09")
       .load
 
     df.show(5, false)
-  }
-
-  test("KDBSPARK-10: Missing schema exception") {
-    val e = intercept[Exception] {
-      spark.read.format("kdb").options(gopts)
-        .option("qexpr", "([] til 10)")
-        .load
-    }.getMessage
-    assert(e.contains("Schema"))
   }
 
   test("KDBSPARK-11: Unsupported datatype") {
@@ -134,7 +125,7 @@ class KdbTestRead extends KdbTestBase {
       val s = StructType(List(StructField("cj", DecimalType(20,2), false)))
       val df = spark.read.format("kdb").options(gopts)
         .schema(s)
-        .option("qexpr", "([] cj:til 10)")
+        .option("expr", "([] cj:til 10)")
         .load
       df.show(false)
     }.getMessage
@@ -145,7 +136,7 @@ class KdbTestRead extends KdbTestBase {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
         .schema("ci long")
-        .option("qexpr", "([] cj:1 2)")
+        .option("expr", "([] cj:1 2)")
         .load
 
       df.show(false)
@@ -157,7 +148,7 @@ class KdbTestRead extends KdbTestBase {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
         .schema("cj int")
-        .option("qexpr", "([] cj:1 2)")
+        .option("expr", "([] cj:1 2)")
         .load
 
       df.show(false)
@@ -169,7 +160,7 @@ class KdbTestRead extends KdbTestBase {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
         .schema("cj long")
-        .option("qexpr", "([] cj:1 2i)")
+        .option("expr", "([] cj:1 2i)")
         .load
 
       df.show(false)
@@ -179,7 +170,7 @@ class KdbTestRead extends KdbTestBase {
 
   test("KDBSPARK-15: Date and Timestamp retrieval") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("function", "test15")
+      .option("func", "test15")
       .load
 
       df.show(false)
@@ -189,7 +180,7 @@ class KdbTestRead extends KdbTestBase {
     val e = intercept[Exception] {
       val df = spark.read.format("kdb").options(gopts)
         .schema("cj short")
-        .option("qexpr", "([] cj:1 2i)")
+        .option("expr", "([] cj:1 2i)")
         .load
 
       df.show(false)
@@ -227,7 +218,7 @@ class KdbTestWrite extends KdbTestBase {
 
     df.write.format("kdb").options(gopts)
       .option("batchsize", 2)
-      .option("function", "test50")
+      .option("func", "test50")
       .option("writeaction", "append")
       .save
   }
@@ -250,35 +241,35 @@ class KdbTestWrite extends KdbTestBase {
 
     df.write.format("kdb").options(gopts)
       .option("batchsize", 2)
-      .option("function", "test51")
+      .option("func", "test51")
       .option("writeaction", "append")
       .save
   }
 
   test("KDBSPARK-52: Array datatypes") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("table", "test08table")
+      .option("expr", "test08table")
       .load
 
     df.select("cxx", "cbb", "chh", "cii", "cjj", "cee", "cff", "cpp", "cdd")
       .write.format("kdb").options(gopts)
       .option("batchsize", 1)
-      .option("function", "test52")
+      .option("func", "test52")
       .option("writeaction", "append")
       .save
   }
 
   test("KDBSPARK-53: Date and Timestamp loopback") {
     val df = spark.read.format("kdb").options(gopts)
-      .option("table", "test53table")
+      .option("expr", "test53table")
       .load
     df.show(false)
 
     df.write.format("kdb").options(gopts)
-      .option("function", "test53")
+      .option("func", "test53")
       .save
 
-    spark.read.format("kdb").options(gopts).option("table", "T53").load.show(false)
+    spark.read.format("kdb").options(gopts).option("expr", "T53").load.show(false)
   }
 }
 

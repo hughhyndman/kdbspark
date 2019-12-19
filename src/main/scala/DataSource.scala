@@ -62,29 +62,25 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
        log.debug(s"  $k: $v")
   }
     
-  val qExprProvided: Boolean = options.get(Opt.QEXPR).orElse("").length > 0
-  var filters = new Array[Filter](0)   
-  var kdbFilters = new Array[Object](0)  
+  val exprProvided: Boolean = options.get(Opt.EXPR).orElse("").length > 0
+  var filters = new Array[Filter](0)
+  var kdbFilters = new Array[Object](0)
   var requiredSchema: StructType = _
 
-  /* If no schema is provided, get it from the kdb+ function */
-  if (schema == null) { 
-    if (qExprProvided)
-      throw new Exception("Schema must always be provided when a q expression is used")
-    
-     schema = getQuerySchema // request kdb+ for it   
-  }
+  /* If no schema is provided, get it from kdb+ */
+  if (schema == null)
+     schema = getQuerySchema // request kdb+ for it
 
   override def readSchema(): StructType = {
     if (requiredSchema != null) requiredSchema else schema
   }
-  
+
   override def pruneColumns(requiredSchema: StructType): Unit = {
     if (log.isDebugEnabled) {
       log.debug("pruneColumns()")
       requiredSchema.foreach(s => log.debug("  " + s.toString))
     }
-    
+
     this.requiredSchema = requiredSchema
   }
 
@@ -92,7 +88,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     log.debug("pushedFilters()")
     filters
   }
-  
+
   /*
    * Pushes down filters, and returns filters that need to be evaluated after scanning.
    */
@@ -103,29 +99,29 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
     }
 
     kdbFilters = new Array[Object](0) // Array of pushdown filters to be serialized to kdb+
-    var supported = Array.empty[Filter] // Filters which kdb+ can support    
-    
+    var supported = Array.empty[Filter] // Filters which kdb+ can support
+
     /* If the kdb+ function doesn't support push-down filters, get Spark to do it */
     if (!canPushFilters) {
       this.filters = supported
       return filters
     }
-         
+
     /*
      * Loop through the filters determining which ones can be supported by kdb+, from which
-     * convert to a form that can be serialized and sent to kdb+. 
+     * convert to a form that can be serialized and sent to kdb+.
      */
     var unsupported = Array.empty[Filter] // Filters that kdb+ cannot support
     filters.foreach {f =>
       val o = convFilter(f)
       if (o != null) {
-        kdbFilters +:= o 
+        kdbFilters +:= o
         supported +:= f
       }
       else
         unsupported +:= f
     }
-    
+
     this.filters = supported
     unsupported
   }
@@ -134,9 +130,7 @@ class KdbDataSourceReader(var schema: StructType, options: DataSourceOptions)
    * Return whether the kdb+ host supports push-down filters
    */
   private def canPushFilters: Boolean = {
-    options.getBoolean(Opt.PUSHFILTERS, Opt.PUSHFILTERSDEF) &&
-      !qExprProvided &&
-      !options.get(Opt.TABLE).isPresent
+    options.getBoolean(Opt.PUSHFILTERS, Opt.PUSHFILTERSDEF) && !exprProvided
   }
      
   /*
