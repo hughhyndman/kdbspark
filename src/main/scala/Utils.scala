@@ -60,7 +60,7 @@ object KdbCall {
       options(Opt.EXPR) = "0!meta " + expr
 
     val hostind = 0 // Use the first host to get the schema
-    val res = call(hostind, options, null)
+    val res = call(hostind, options, null, null)
     if (!res.isInstanceOf[c.Flip])
       throw new Exception("Schema call must return an unkeyed table with meta information")
     res
@@ -75,7 +75,7 @@ object KdbCall {
     )
 
     val hostind = optGetInt(options, Opt.PARTITIONID, 0)
-    val res = call(hostind, options, null)
+    val res = call(hostind, options, objmap, null)
     if (!res.isInstanceOf[c.Flip])
       throw new Exception("Read call must return an unkeyed table with query results")
     res
@@ -84,10 +84,10 @@ object KdbCall {
   def write(options: java.util.Map[String, String], schema: StructType, coldata: Array[Object]): Unit = {
     val hostind = optGetInt(options, Opt.PARTITIONID, 0)
     val flip = new c.Flip(new c.Dict(schemaColumns(schema), coldata))
-    val res = call(hostind, options, flip)
+    val res = call(hostind, options, null, flip)
   }
 
-  def call(hostind: Int, options: java.util.Map[String, String], writerows: Object): Object = {
+  def call(hostind: Int, options: java.util.Map[String, String], objmap: Map[String, Object], writerows: Object): Object = {
     /*
      * If a list of kdb+ host names is provided, use the hostind as the
      * index. A list of ports, parallel to the hosts may be provided.
@@ -110,7 +110,7 @@ object KdbCall {
 
     /* if we are calling a cooperating q function, bundle the options into a dictionary */
     val optionsdict = if (func.length > 0)
-      optionsToDict(options, Map[String, Object]())
+      optionsToDict(options, objmap)
     else
       null
 
@@ -186,11 +186,13 @@ object KdbCall {
       i = i + inc;
     }
 
-    /* Append additional objects */
-    for ((k, v) <- objmap) {
-      keys(i) = new String(k)
-      vals(i) = v
-      i += 1
+    if (objmap != null) {
+      /* Append additional objects */
+      for ((k, v) <- objmap) {
+        keys(i) = new String(k)
+        vals(i) = v
+        i += 1
+      }
     }
 
     /* Trim the two arrays as we don't provide all options to kdb+ */
