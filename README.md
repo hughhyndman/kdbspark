@@ -54,7 +54,7 @@ Kdbspark offers two methods to get data from kdb+. The caller can provide either
 
 Providing a q-language expression that returns a table (unkeyed) is the simplest method. Examples are provided below.
 
-```scala
+```
 q)mytbl:([] 
   id:1000 2000 0Nj; 
   ts:2020.01.02D03:04:05.555 2020.02.03D06:07:08.999,.z.p; 
@@ -112,7 +112,7 @@ scala> df.show
 +--------------------+------+
 ```
 
-Specifying false (not null) for the nullable field of StructField will result in better performance as KdbSpark does not need to examine each value before passing it to Spark, although you will have to consider how to handle the null placeholder value. A table of placeholder values can be found in the Null Values **** section.
+Specifying false (not null) for the nullable field of StructField will result in better performance as KdbSpark does not need to examine each value before passing it to Spark, although you will have to consider how to handle the null placeholder value.
 
 ### Function Name: option("func", "...")
 
