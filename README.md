@@ -28,12 +28,13 @@ only showing top 3 rows
 ```
 
 ## Outstanding Work List
-- [] Complete README 
-- [] Renumber tests 
-- [] Sample code for write support
-- [] Document Spark streaming to kdb+
-- [] Test with Yarn, Mesos, and Kubernetes
-- [] Include executor IP in options passed to func if Log.DEBUG
+- [ ] Complete README 
+- [ ] Renumber tests 
+- [ ] Sample code for write support
+- [ ] Document Spark streaming to kdb+
+- [ ] Test with Yarn, Mesos, and Kubernetes
+- [ ] Include executor IP in options passed to func if Log.DEBUG
+- [ ] Hold socket connection open during write
 
 ## Reading Data From kdb+
 
