@@ -28,12 +28,13 @@ only showing top 3 rows
 ```
 
 ## Outstanding Work List
-- [] Complete README 
-- [] Renumber tests 
-- [] Sample code for write support
-- [] Document Spark streaming to kdb+
-- [] Test with Yarn, Mesos, and Kubernetes
-- [] Include executor IP in options passed to func if Log.DEBUG
+- [ ] Complete README 
+- [ ] Renumber tests 
+- [ ] Sample code for write support
+- [ ] Document Spark streaming to kdb+
+- [ ] Test with Yarn, Mesos, and Kubernetes
+- [ ] Include executor IP in options passed to func if Log.DEBUG
+- [ ] Hold socket connection open during write
 
 ## Reading Data From kdb+
 
@@ -310,5 +311,7 @@ Show ETL to and from kdb+, Parquet, BigQuery, Postgres, and a Spark streaming ex
 
 ## Acknowledgements
 
-Performance and memory monitoring was achieved by the support of YourKit GmbH. YourKit supports open source projects with innovative and intelligent tools for monitoring and profiling Java and .NET applications. YourKit is the creator of [YourKit Java Profiler](https://www.yourkit.com/java/profiler/) and [YourKit YouMonitor](https://www.yourkit.com/youmonitor/).
+![YourKit Logo](https://github.com/hughhyndman/kdbspark/blob/master/src/test/resources/yklogo.png)
+
+Performance and memory monitoring was achieved with the support of YourKit GmbH. YourKit supports open source projects with innovative and intelligent tools for monitoring and profiling Java and .NET applications. YourKit is the creator of [YourKit Java Profiler](https://www.yourkit.com/java/profiler/) and [YourKit YouMonitor](https://www.yourkit.com/youmonitor/).
 
