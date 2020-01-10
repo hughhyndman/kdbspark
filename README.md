@@ -34,7 +34,6 @@ only showing top 3 rows
 - [ ] Document Spark streaming to kdb+
 - [ ] Test with Yarn, Mesos, and Kubernetes
 - [ ] Include executor IP in options passed to func if Log.DEBUG
-- [ ] Hold socket connection open during write
 
 ## Reading Data From kdb+
 
