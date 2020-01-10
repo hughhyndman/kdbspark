@@ -151,6 +151,9 @@ object KdbCall {
         throw e
       }
     }
+    finally {
+      con.close()
+    }
 
     res
   }
