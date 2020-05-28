@@ -129,7 +129,7 @@ scala> val df = spark.read.format("kdb").
 ```q
 sampleQuery:{[parms]
   $[parms[`partitionid]=-1; // If asked for schema,
-    0!meta sampleTable // then return unkeyed meta of table
+    0!meta sampleTable; // then return unkeyed meta of table
     sampleTable // else return table
     ]
   }
